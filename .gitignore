@@ -1,0 +1,15 @@
+*/__pycache__
+*/__pycache__/*
+
+*~
+*.lnk
+
+*.pyc
+*.bak
+
+build/
+dist/
+pysurfacefit.egg-info/
+
+tests/*
+!tests/*.py
