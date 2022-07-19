@@ -257,8 +257,8 @@ def compile_gridcalc_fortran(model,compiler='gfortran'):
         fil.write(gridcalc_main_source)  
         
     # Compile the existing Fortran source.
-    #subprocess.run([compiler,'-o',exefile,filename,'gridcalc.f90'])
-    subprocess_run_crossplatform([compiler,'-o',exefile,filename,'gridcalc.f90'])
+    subprocess.run([compiler,'-o',exefile,filename,'gridcalc.f90'])
+    #subprocess_run_crossplatform([compiler,'-o',exefile,filename,'gridcalc.f90'])
     
     # Get exefile and create the resulting function.
     filestem,_ = os.path.splitext(filename)

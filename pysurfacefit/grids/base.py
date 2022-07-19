@@ -1,6 +1,3 @@
-from abc import ABC, abstractmethod
-import matplotlib.pyplot as plt
-import pylab as pl
 import numpy as np
 
 def assert_(desc,vars):
