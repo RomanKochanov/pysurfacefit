@@ -98,7 +98,7 @@ def parse_dataspec(CONFIG):
     col_dataspec = j.import_fixcol(filename)
     return col_dataspec
 
-def read_fitgroups(CONFIG):
+def read_fitgroups(CONFIG,verbose=False):
     """ Read data fitgroups based on the config file information. """
     
     # Create unified collection for plotting.
@@ -137,9 +137,9 @@ def read_fitgroups(CONFIG):
         fitgroup_path = item['path'].strip()
         fitgroup_name = item['alias'].strip()
         fitgroup_wht_mul = item['wht_mul']
-        print('\n===============================')
-        print(fitgroup_name)
-        print('===============================')
+        if verbose: print('\n===============================')
+        if verbose: print(fitgroup_name)
+        if verbose: print('===============================')
         # Get points from the CSV file
         col = j.Collection(); col.import_csv(fitgroup_path)
         # Apply data cutoff
@@ -151,7 +151,8 @@ def read_fitgroups(CONFIG):
         col.assign('fit_weight',wht_fun)
         data_whts = col.getcol('fit_weight')
         # Print collection contents
-        col.tabulate(['N',*(INPUTS+[OUTPUT]),'fit_weight'])
+        if verbose:
+            col.tabulate(['N',*(INPUTS+[OUTPUT]),'fit_weight'])
         # Prepare fitting grid (list)
         grid = List(*reduce(lambda x,y:x+y,zip(INPUTS,input_columns))) # list-based grid
         # Prepare fitgroup for points
@@ -247,7 +248,7 @@ class {modelname}(ModelSympy):
 model = {modelname}()
 
 if os.path.exists('{modelname}.csv'):
-    model.read_params('{modelname}.csv')
+    model.load_params('{modelname}.csv')
 else:
     model.save_params('{modelname}.csv')
 """
@@ -301,6 +302,17 @@ def import_module_by_path(module_name,module_path):
     spec.loader.exec_module(module)
     return module
 
+def load_model(CONFIG):
+    """ Load model from its module.
+        Model should read its parameters automatically! """
+    module_name = CONFIG['MODEL']['model']
+    #module_path = os.path.abspath(module_name+'.py') # absolute path
+    module_path = os.path.join('./',module_name+'.py') # relative path
+    module = import_module_by_path(module_name,module_path)
+    model_object = 'model'
+    model = getattr(module,model_object)
+    return model
+
 def fit(CONFIG):
     """ Start fitting procedure. """
     
@@ -309,40 +321,47 @@ def fit(CONFIG):
     rubber_on = CONFIG['FIT']['rubber_on']
     fitting_method = CONFIG['FIT']['fitting_method']
     analytic_jacobian = CONFIG['FIT']['analytic_jacobian']
-    module_name = CONFIG['MODEL']['model']
+    #module_name = CONFIG['MODEL']['model']
     #module_path = os.path.abspath(module_name+'.py') # absolute path
-    module_path = os.path.join('./',module_name+'.py') # relative path
+    #module_path = os.path.join('./',module_name+'.py') # relative path
     fitopts = parse_fit_options(CONFIG)
     #model_name = 'Model'
-    model_name = module_name
-    model_object = 'model'
+    #model_name = module_name
+    #model_object = 'model'
     #model = getattr(__import__(module_name),model_name)
-    module = import_module_by_path(module_name,module_path)
-    model = getattr(module,model_object)
+    #module = import_module_by_path(module_name,module_path)
+    #model = getattr(module,model_object)
+    model = load_model(CONFIG)
     fitgroups,_ = read_fitgroups(CONFIG)
-    fitfile = module_name+'.fit'
-    modelfile = module_name+'.model'
+    #fitfile = module_name+'.fit'
+    #modelfile = module_name+'.model'
     
-    # If fit file is absent, create a fit from scratch.
-    if not os.path.exists(fitfile):
-        f = Fitter(model=model,fitgroups=fitgroups,
+    # Create Fitter object from scratch.
+    f = Fitter(model=model,fitgroups=fitgroups,
             weighted=weighted_fit,rubber_on=rubber_on,
             method=fitting_method,jac=analytic_jacobian,
             **fitopts);
-    else:
-        f = deserialize_fit(fitfile)
-        f.__fitgroups__ = fitgroups    
+    
+    # If fit file is absent, create a fit from scratch.
+    #if not os.path.exists(fitfile):
+    #    f = Fitter(model=model,fitgroups=fitgroups,
+    #        weighted=weighted_fit,rubber_on=rubber_on,
+    #        method=fitting_method,jac=analytic_jacobian,
+    #        **fitopts);
+    #else:
+    #    f = deserialize_fit(fitfile)
+    #    f.__fitgroups__ = fitgroups    
         
     # Start fit.
     f.fit()
     
     # Save fit.
-    serialize_fit(f,fitfile)
+    #serialize_fit(f,fitfile)
 
     # Save model.
-    serialize_model(f.model_final,modelfile)
+    #serialize_model(f.model_final,modelfile)
+    f.model_final.save_params(model.__class__.__name__+'.csv')
     
-
 ##############
 #### STAT ####
 ##############
@@ -542,13 +561,13 @@ def plot_residuals(CONFIG):
     
     # Get options from the config file.
     resids_weighted = CONFIG['PLOTTING']['resids_weighted']
-    module_name = CONFIG['MODEL']['model']
-    model_name = module_name
-    modfile = model_name+'.model'
+    #module_name = CONFIG['MODEL']['model']
+    #model_name = module_name
+    #modfile = model_name+'.model'
 
     # Import model module (in other case, deserialization is not working).
-    module_path = os.path.join('./',module_name+'.py') # relative path
-    module = import_module_by_path(module_name,module_path)
+    #module_path = os.path.join('./',module_name+'.py') # relative path
+    #module = import_module_by_path(module_name,module_path)
 
     # Get input and output names
     INPUTS = parse_input_columns(CONFIG)
@@ -560,8 +579,9 @@ def plot_residuals(CONFIG):
     resids_x_axes = resids_x_axes.strip()
     if not resids_x_axes: resids_x_axes=OUTPUT
 
-    # Get fit object from file.
-    model = deserialize_model(modfile)
+    # Get model and read parameters from file.
+    #model = deserialize_model(modfile)
+    model = load_model(CONFIG)
     
     # Get data collection.
     _,col_data = read_fitgroups(CONFIG)
@@ -580,7 +600,8 @@ def plot_residuals(CONFIG):
     model_vals = model.calculate(grid)
        
     ax1 = plt.subplot2grid((4,1),(0,0),rowspan=3)
-    plt.title(modfile)
+    #plt.title(modfile)
+    plt.title('residuals')
     ax1.get_xaxis().get_major_formatter().set_useOffset(False) # set normal format
     leg = []
     plt.plot(resid_axis_data,output_column,'ro'); leg.append('data')
@@ -651,9 +672,9 @@ def plot_sections(CONFIG):
     """ Plot model cuts and compare to the data points (if any). """
     
     # Get options from the config file.
-    module_name = CONFIG['MODEL']['model']
-    model_name = module_name
-    fitfile = model_name+'.fit'
+    #module_name = CONFIG['MODEL']['model']
+    #model_name = module_name
+    #fitfile = model_name+'.fit'
 
     # Get argument names.
     argnames = get_arguments(CONFIG)
@@ -686,16 +707,20 @@ def plot_sections(CONFIG):
     OUTPUT = CONFIG['DATA']['output_column']
     
     # Import model module (in other case, deserialization is not working).
-    module_path = os.path.join('./',module_name+'.py') # relative path
-    module = import_module_by_path(module_name,module_path)
+    #module_path = os.path.join('./',module_name+'.py') # relative path
+    #module = import_module_by_path(module_name,module_path)
     
     # Get fitter object from file.
-    f = deserialize_fit(fitfile)
+    #f = deserialize_fit(fitfile)
+    
+    model = load_model(CONFIG)
     
     # Get fitgroups and calculate statistics.
-    fitgroups = f.__fitgroups__
-    for grp in fitgroups:
-        grp.calculate_fit_statistics()
+    fitgroups,_ = read_fitgroups(CONFIG)
+    # HOW TO CALCULATE FIT STATISTICS???
+    #fitgroups = f.__fitgroups__
+    #for grp in fitgroups:
+    #    grp.calculate_fit_statistics()
     
     # Get model components list.
     components = get_model_components(CONFIG)
@@ -746,9 +771,9 @@ def plot_sections(CONFIG):
     calc_data = [meshes[i] for i in indexes_unfixed]
     
     if calculate_components:
-        results = f.model_final.calculate_components(g,compnames=components)
+        results = model.calculate_components(g,compnames=components)
     else:
-        results = f.model_final.calculate(g); results = [results]
+        results = model.calculate(g); results = [results]
             
     for res,compname,color in zip(results,['MODEL']+components,cycle(COLORS)):
         print('plotting %s (%s)'%(compname,color))

@@ -87,7 +87,7 @@ class Model:
     def save_params(self,filename):
         self.__params__.export_csv(filename)
         
-    def read_params(self,filename):
+    def load_params(self,filename):
         col = j.import_csv(filename)
         for item in col.getitems():
             parname = item['name']
