@@ -14,6 +14,7 @@ class Parameters(Collection):
         self.generate(N=N,prefix=prefix,group=group,
                       names=names,values=values,flags=flags,
                       mins=mins,maxs=maxs,weights=weights)
+        self.order = ['group','name','value','min','max','weight','flag','__id__']
                                     
     def __iter__(self):
         return iter(self.getitems()) # strange peculiarity of Python 3

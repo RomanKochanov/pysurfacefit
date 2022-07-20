@@ -206,7 +206,9 @@ def create_model_package(CONFIG):
     #model_name = 'Model'
     model_name = module_name
         
-    template = """from pysurfacefit.models.sympy import ModelSympy
+    template = """import os
+
+from pysurfacefit.models.sympy import ModelSympy
 from pysurfacefit.fitpars import Par, Parameters
     
 class {modelname}(ModelSympy):
@@ -243,6 +245,11 @@ class {modelname}(ModelSympy):
         return res
         
 model = {modelname}()
+
+if os.path.exists('{modelname}.csv'):
+    model.read_params('{modelname}.csv')
+else:
+    model.save_params('{modelname}.csv')
 """
      
     content = template.\
@@ -331,9 +338,10 @@ def fit(CONFIG):
     
     # Save fit.
     serialize_fit(f,fitfile)
-    
+
     # Save model.
     serialize_model(f.model_final,modelfile)
+    
 
 ##############
 #### STAT ####

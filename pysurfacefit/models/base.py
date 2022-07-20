@@ -1,5 +1,5 @@
 import numpy as np
-
+import jeanny3 as j
 from algopy import UTPM
 
 class Model:
@@ -83,6 +83,16 @@ class Model:
                 }
         """
         raise NotImplementedError
+        
+    def save_params(self,filename):
+        self.__params__.export_csv(filename)
+        
+    def read_params(self,filename):
+        col = j.import_csv(filename)
+        for item in col.getitems():
+            parname = item['name']
+            if parname in self.__params__.__index__:
+                self.__params__[parname].update(item)
         
     def __repr__(self):
         return str(self.__params__)
