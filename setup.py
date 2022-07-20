@@ -7,7 +7,7 @@ setup(
     author_email="",
     description="Multidimensional data fitting tool in Python",
     #url="",
-    python_requires=">=3.5",
+    python_requires=">=3.7",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

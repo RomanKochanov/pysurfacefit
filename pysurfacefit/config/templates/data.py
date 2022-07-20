@@ -34,5 +34,5 @@ class Default(ConfigSection):
 {global_cutoff_max}
 {global_cutoff_min}
 """
-    wht_fun = 'lambda *args: 1'
+    wht_fun = 'lambda v: 1'
     dataspec = 'dataspec.txt'
