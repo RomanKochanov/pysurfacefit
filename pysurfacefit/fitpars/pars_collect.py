@@ -37,8 +37,10 @@ class Parameters(Collection):
         Append a parameter to the set. Pars can be either a parameter,
         or a list of parameters.
         """
-        if type(pars) not in {list,tuple,Parameters}:
+        if type(pars) is Par:
             pars = [pars]
+        elif type(pars) not in {list,tuple}:
+            raise Exception('Either Par, or list/tuple of Pars are allowed')
         for par in pars:
             par['group'] = group
             if par['name'] not in self.__index__:

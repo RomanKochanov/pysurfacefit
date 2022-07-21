@@ -41,9 +41,10 @@ class FitGroups:
             whts = grp.__whtmul__*grp.__weights__
             min_wht = np.min(whts); max_wht = np.max(whts)
             wht_sd = np.sqrt(wht_sse/grp.length)
+            unwht_sd = np.sqrt(unwht_sse/grp.length)
             N = np.prod(weighted_resids.shape)
-            print('%20s:   N:%5d   MIN_WHT: %5.1e   MAX_WHT: %5.1e   WHT_SSE: %7.3e   UNWHT_SSE: %7.3e   WHT_SD: %7.3e'%\
-            (grp.__name__,N,min_wht,max_wht,wht_sse,unwht_sse,wht_sd))
+            print('%20s:   N:%5d   MIN_WHT: %5.1e   MAX_WHT: %5.1e   WHT_SSE: %7.3e   UNWHT_SSE: %7.3e   WHT_SD: %7.3e   UNWHT_SD: %7.3e'%\
+            (grp.__name__,N,min_wht,max_wht,wht_sse,unwht_sse,wht_sd,unwht_sd))
             
     def split_global_jacobian(self,jac):
         """
