@@ -813,3 +813,37 @@ def plot(CONFIG):
     else:
         print('ERROR: unknown plotting mode "%s"'%plot_mode)
         sys.exit()
+
+def calc(CONFIG):
+    """ Calculate fitetd model on a grid. """
+    
+    # Get options from the config file.    
+    output_file = CONFIG['CALC']['output_file']
+    
+    # Get input and output names.
+    inputs = parse_input_columns(CONFIG)
+    output = CONFIG['DATA']['output_column']
+
+    # Load model.
+    model = load_model(CONFIG)
+    
+    # Get gridspec and grid.
+    gridspec,_ = \
+        parse_gridspec(CONFIG,CONFIG['CALC']['gridspec'])
+    grid_calc = Grid(*reduce(lambda x,y:x+y,gridspec))
+
+    # Calculate modeland flatten meshes.
+    calc_model = model.calculate(grid_calc)
+    calc_model = calc_model.flatten()
+    meshes = grid_calc.get_meshes(flat=True)
+        
+    # Create and write output CSV file.
+    with open(output_file,'w') as f:
+        # header
+        f.write(';'.join(inputs+[output])+'\n')
+        # body
+        for vals in zip(*(meshes+[calc_model])):
+            buf = ';'.join([str(val) for val in vals])+'\n'
+            f.write(buf)
+            
+    print('Calculated model values are saved to %s'%output_file)

@@ -63,7 +63,11 @@ def main():
 #        action='store_const', const=True, default=False,
     parser.add_argument('--plot', nargs='*', type=str, 
         help='Stage 6: plot sections of the model and compare to data')
-                
+
+    parser.add_argument('--calc', dest='calc',
+        action='store_const', const=True, default=False,
+        help='Stage 7: calculate model values on grid')
+
     args = parser.parse_args() 
     
     CONFIG = config
@@ -106,3 +110,5 @@ def main():
         if args.plot:
             CONFIG['PLOTTING']['gridspec'] = args.plot[0]
         tasks.plot(CONFIG)
+    elif args.calc is not None:
+        tasks.calc(CONFIG)
