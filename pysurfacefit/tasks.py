@@ -63,12 +63,13 @@ def create_dataspec(CONFIG):
 A alias str
 P path str
 W wht_mul float
-F filter str
+T type int
 I include int
 
 //DATA
-A_________________P_______________________W__________F__________I______
-    """
+A_________________P_______________________W__________T__________I______
+# type: 0/None -> data, -1 -> penalty down, 1 -> penalty up
+"""
     with open(os.path.join(project_dir,filename),'w') as f:
         f.write(content)
     return filename
@@ -125,7 +126,7 @@ def read_fitgroups(CONFIG,verbose=False):
     if datafile:
         col_dataspec.update({
             'alias':'default','path':datafile,
-            'wht_mul':1.0,'filter':wht_fun,'include':1})
+            'wht_mul':1.0,'type':None,'include':1})
     
     # Second, get fitgroups from the data in the csv file.
     col = parse_dataspec(CONFIG)
@@ -815,7 +816,7 @@ def plot(CONFIG):
         sys.exit()
 
 def calc(CONFIG):
-    """ Calculate fitetd model on a grid. """
+    """ Calculate fitted model on a grid. """
     
     # Get options from the config file.    
     output_file = CONFIG['CALC']['output_file']
@@ -832,7 +833,7 @@ def calc(CONFIG):
         parse_gridspec(CONFIG,CONFIG['CALC']['gridspec'])
     grid_calc = Grid(*reduce(lambda x,y:x+y,gridspec))
 
-    # Calculate modeland flatten meshes.
+    # Calculate model and flatten meshes.
     calc_model = model.calculate(grid_calc)
     calc_model = calc_model.flatten()
     meshes = grid_calc.get_meshes(flat=True)
