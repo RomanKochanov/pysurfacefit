@@ -717,7 +717,8 @@ def plot_sections(CONFIG):
     # Do plotting stuff.
     if n_unfixed==2:
         fig = plt.figure()
-        plotter = Axes3D(fig)
+        #plotter = Axes3D(fig)
+        plotter = fig.add_subplot(111, projection='3d')
     elif n_unfixed==1:
         plotter = plt
     else:
@@ -726,7 +727,6 @@ def plot_sections(CONFIG):
     print('')
 
     leg = []
-    leg.append('calc_model')
 
     for fitgroup,grp_color in zip(fitgroups,cycle(COLORS)):
         
@@ -780,9 +780,15 @@ def plot_sections(CONFIG):
     for res,compname,color in zip(results,['MODEL']+components,cycle(COLORS)):
         print('plotting %s (%s)'%(compname,color))
         if n_unfixed==2:
-            plotter.plot_surface(*calc_data,res,alpha=surface_opacity,color=color)
+            surf = plotter.plot_surface(*calc_data,res,alpha=surface_opacity,color=color)
+            # solution for Matplotlib >=3.3
+            # https://stackoverflow.com/questions/4536103/how-can-i-upgrade-specific-packages-using-pip-and-a-requirements-file
+            surf._facecolors2d = surf._facecolor3d
+            surf._edgecolors2d = surf._edgecolor3d
         elif n_unfixed==1:
             plotter.plot(*calc_data,res,color=color)
+        else:
+            raise NotImplementedError
 
     plt.title(make_title(gridspec,indexes_unfixed,bindings))
     
@@ -796,10 +802,13 @@ def plot_sections(CONFIG):
     else:
         raise NotImplementedError
     
-    if plot_outlier_stats: plt.colorbar(sc)
-        
+    if plot_outlier_stats: 
+        plt.colorbar(sc)
+
+    leg += ['calc_model']
+    plotter.legend(leg)
+
     plt.grid(True)
-    plt.legend(leg)
     plt.show()
     
 def plot(CONFIG):

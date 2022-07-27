@@ -34,7 +34,7 @@ class Parameters(Collection):
     def __getitem__(self,ID):
         """
         Get parameter object by its name.
-        ID = (group,name)
+        ID = name
         """
         return self.__dicthash__[ID]
         
@@ -50,7 +50,8 @@ class Parameters(Collection):
         for par in pars:
             par['group'] = group
             name = par['name']
-            ID = (group,name)
+            #ID = (group,name)
+            ID = name
             if ID in self.__dicthash__:
                 raise Exception('%s already in __dicthash__ '
                     '(consider renaming parameter)'%str(ID))
