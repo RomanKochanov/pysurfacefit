@@ -180,6 +180,9 @@ class AbstractFitPoints:
         """Derivative by calc, scalar"""
         raise NotImplementedError
         
+    def __repr__(self):
+        return self.__name__
+        
 class FitPoints(AbstractFitPoints): # can be sped up by re-defining resids and d_resids
     def resid_func(self,obs,calc):
         return obs-calc

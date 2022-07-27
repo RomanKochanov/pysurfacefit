@@ -611,7 +611,8 @@ def plot_residuals(CONFIG):
     
     plt.show()    
 
-COLORS = ['blue','red','green','magenta','black','cyan','yellow','purple']
+COLORS = ['blue','red','green','magenta','black','cyan',
+    'yellow','purple','orange','brown','pink','grey']
 
 def get_argument_bindings(CONFIG):
     """
@@ -722,14 +723,27 @@ def plot_sections(CONFIG):
     else:
         raise NotImplementedError
 
-    for fitgroup,grp_color in zip(fitgroups,COLORS):
-            
+    print('')
+
+    leg = []
+    leg.append('calc_model')
+
+    for fitgroup,grp_color in zip(fitgroups,cycle(COLORS)):
+        
         # find index of all data points whose fixed columns correspond to gridspec
         ind = np.full(fitgroup.__inputgrid__.__shape__,True)
         for index_fixed in indexes_fixed:
             argname_fixed,colname_fixed = bindings[index_fixed]
             val_fixed = gridspec_dict[argname_fixed][0]
             ind *= abs(fitgroup[colname_fixed]-val_fixed)<0.001
+            
+        n_tot = len(ind)
+        n_sel = np.count_nonzero(ind)
+        print('%s: %d selected out of %d'%(fitgroup,n_sel,n_tot))    
+        
+        if n_sel==0: continue
+        
+        leg.append('%s (%d/%d)'%(fitgroup.__name__,n_sel,n_tot))
         
         meshes = fitgroup.__inputgrid__.get_meshes(ind)
         #x_data = meshes[indexes_unfixed[0]]
@@ -785,6 +799,7 @@ def plot_sections(CONFIG):
     if plot_outlier_stats: plt.colorbar(sc)
         
     plt.grid(True)
+    plt.legend(leg)
     plt.show()
     
 def plot(CONFIG):
