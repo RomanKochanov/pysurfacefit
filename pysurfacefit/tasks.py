@@ -10,7 +10,7 @@ import jeanny3 as j
 from functools import reduce
 from itertools import cycle
 
-from .data import FitGroups, FitPoints
+from .data import FitGroups, FitPoints, PenaltyPointsUp, PenaltyPointsDown
 from .grids import Grid, List
 from .fitter import Fitter
 from .formats.dill import serialize_fit, deserialize_fit 
@@ -137,6 +137,7 @@ def read_fitgroups(CONFIG,verbose=False):
         # Get fitgroup properties
         fitgroup_path = item['path'].strip()
         fitgroup_name = item['alias'].strip()
+        fitgroup_type = item['type']
         fitgroup_wht_mul = item['wht_mul']
         if verbose: print('\n===============================')
         if verbose: print(fitgroup_name)
@@ -157,6 +158,16 @@ def read_fitgroups(CONFIG,verbose=False):
         # Prepare fitting grid (list)
         grid = List(*reduce(lambda x,y:x+y,zip(INPUTS,input_columns))) # list-based grid
         # Prepare fitgroup for points
+        if fitgroup_type is None:
+            FitPointsType = FitPoints
+        elif fitgroup_type==-1:
+            FitPointsType = PenaltyPointsDown
+        elif fitgroup_type==1:
+            FitPointsType = PenaltyPointsUp
+        else:
+            print('ERROR: unknown dataspec type: %s'%str(fitgroup_type))
+            sys.exit()
+        print('Treating %s fitgroup as %s'%(fitgroup_name,FitPointsType.__name__))
         GRP_DATA = FitPoints(
             name=fitgroup_name,input=grid,output=output_column,
             whtmul=fitgroup_wht_mul,whts=data_whts,active=True
