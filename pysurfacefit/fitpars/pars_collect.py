@@ -10,7 +10,7 @@ class Parameters(Collection):
                  values=None,flags=True,mins=None,maxs=None,
                  weights=None,group='default'):
         self.initialize() # call initialization of a Collection
-        self.__index__ = {}
+        #self.__index__ = {}
         self.generate(N=N,prefix=prefix,group=group,
                       names=names,values=values,flags=flags,
                       mins=mins,maxs=maxs,weights=weights)
@@ -26,11 +26,17 @@ class Parameters(Collection):
     def __npar__(self):
         return len(self.ids())
         
-    def __getitem__(self,name):
+    #def __getitem__(self,name):
+    #    """
+    #    Get parameter object by its name.
+    #    """
+    #    return self.__dicthash__[self.__index__[name]]
+    def __getitem__(self,ID):
         """
         Get parameter object by its name.
+        ID = (group,name)
         """
-        return self.__dicthash__[self.__index__[name]]
+        return self.__dicthash__[ID]
         
     def append(self,pars,group='default'):
         """
@@ -43,12 +49,12 @@ class Parameters(Collection):
             raise Exception('Either Par, or list/tuple of Pars are allowed')
         for par in pars:
             par['group'] = group
-            if par['name'] not in self.__index__:
-                self.update(par)
-                self.__index__[par['name']] = par['__id__']
-            else:
-                id_ = self.__index__[par['name']]
-                self.__dicthash__[id_] = par
+            name = par['name']
+            ID = (group,name)
+            if ID in self.__dicthash__:
+                raise Exception('%s already in __dicthash__ '
+                    '(consider renaming parameter)'%str(ID))
+            self.__dicthash__[ID] = par
                                        
     def generate(self,N=None,prefix=None,names=None,group='default',
                  values=None,flags=True,mins=None,maxs=None,weights=None):

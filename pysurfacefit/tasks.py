@@ -502,41 +502,28 @@ def codegen(CONFIG):
     create_fortran = to_bool( CONFIG['CODEGEN']['create_fortran'] )
     compare_fortran = to_bool( CONFIG['CODEGEN']['compare_fortran'] )
     compiler = CONFIG['CODEGEN']['compiler_fortran']
-    module_name = CONFIG['MODEL']['model']
-    model_name = module_name
-    modelfile = model_name+'.model'
     
     # =====================
     # GENERATE FORTRAN CODE
     # =====================
 
-    # Check if model file exists.
-    if not os.path.isfile(modelfile):
-        print('ERROR: cannot find the model file "%s"'%modelfile)
-        sys.exit()
-    
-    # Import model module (in other case, deserialization is not working).
-    #model = deserialize_model(model_name+'.model')
-    module_path = os.path.join('./',module_name+'.py') # relative path
-    module = import_module_by_path(module_name,module_path)
-    
-    # Get model object from file.
-    model = deserialize_model(modelfile)
-    
-    # Create compiled Fortran gridcalc
-    if create_fortran:
-        model.generate_fortran_90()
-        #create_pes_interface(model)
-        #create_pots_interface()
+    # Get model and read parameters from file.
+    model = load_model(CONFIG)
 
     # Get grid to calculate the generated routines on.
     gridspec,_ = parse_gridspec(CONFIG,CONFIG['CODEGEN']['gridspec'])
     grid_compfort = Grid(*reduce(lambda x,y:x+y,gridspec))
+    calc_model_python = model.calculate(grid_compfort)
+        
+    # Create compiled Fortran gridcalc
+    if create_fortran:
+        model.generate_fortran_90()
+        create_pes_interface(model)
+        create_pots_interface()
 
     # Compare Python version with fortran is needed.
     if compare_fortran:
         model.compile_fortran_90(compiler)
-        calc_model_python = model.calculate(grid_compfort)
         calc_model_fortran = model.__function_fortran__(grid_compfort)
         abs_err_compfort = np.abs(calc_model_python - calc_model_fortran)
         abs_err_compfort_min = np.min(abs_err_compfort)

@@ -89,10 +89,14 @@ class Model:
         
     def load_params(self,filename):
         col = j.import_csv(filename)
-        for item in col.getitems():
-            parname = item['name']
-            if parname in self.__params__.__index__:
-                self.__params__[parname].update(item)
+        col.index(lambda v:(v['group'],v['name']))
+        for ID in col.__dicthash__:
+            group,name = ID
+            item = col.__dicthash__[ID]
+            if ID in self.__params__.__dicthash__:
+                self.__params__.__dicthash__[ID].update(item)
+            else:
+                self.__params__.__dicthash__[ID] = item
         
     def __repr__(self):
         return str(self.__params__)
