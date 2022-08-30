@@ -53,6 +53,18 @@ def generate_powers_layer_3d(total_power):
             powers.append([i,j,k])
     return powers
 
+def generate_powers_layer_3d_symm(total_power):
+    """
+    Generate layer of powers for 3d polynomial for a given total power (symmetrized i<=j)
+    """
+    powers = []
+    for k in range(total_power+1):
+        i_plus_j = total_power-k
+        for i in range(i_plus_j+1):
+            j = i_plus_j - i
+            if i<=j: powers.append([i,j,k])
+    return powers
+    
 def generate_powers_3d_rsymm(maxpower):
     """
     Generate powers for polynomial symmetrized by first 2 coordinates (r1,r2)
