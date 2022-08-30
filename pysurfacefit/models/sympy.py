@@ -159,11 +159,11 @@ def create_pes_interface(model):
     '! au==FALSE => r in angstroem, rho in rad' + '\n' + \
     'if (au) then' + '\n' + \
     '    r1_ = r1' + '\n' + \
-    '    r2_ = r1' + '\n' + \
+    '    r2_ = r2' + '\n' + \
     '    r3_ = r3' + '\n' + \
     'else' + '\n' + \
     '    r1_ = r1/BOHR_TO_ANGSTROEM' + '\n' + \
-    '    r2_ = r1/BOHR_TO_ANGSTROEM' + '\n' + \
+    '    r2_ = r2/BOHR_TO_ANGSTROEM' + '\n' + \
     '    r3_ = PI_IN_RADIANS-r3' + '\n' + \
     'endif' + '\n\n' + \
     '' + \
