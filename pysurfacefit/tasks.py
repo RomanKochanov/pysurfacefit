@@ -329,10 +329,10 @@ def fit(CONFIG):
     """ Start fitting procedure. """
     
     # Get options from the config file.
-    weighted_fit = CONFIG['FIT']['weighted_fit']
-    rubber_on = CONFIG['FIT']['rubber_on']
+    weighted_fit = to_bool(CONFIG['FIT']['weighted_fit'])
+    rubber_on = to_bool(CONFIG['FIT']['rubber_on'])
     fitting_method = CONFIG['FIT']['fitting_method']
-    analytic_jacobian = CONFIG['FIT']['analytic_jacobian']
+    analytic_jacobian = to_bool(CONFIG['FIT']['analytic_jacobian'])
     #module_name = CONFIG['MODEL']['model']
     #module_path = os.path.abspath(module_name+'.py') # absolute path
     #module_path = os.path.join('./',module_name+'.py') # relative path
@@ -385,7 +385,7 @@ def stat(CONFIG):
     module_name = CONFIG['MODEL']['model']
     model_name = module_name
     fitfile = model_name+'.fit'
-    output_symbolic_func = CONFIG['STAT']['output_symbolic_func']
+    output_symbolic_func = to_bool(CONFIG['STAT']['output_symbolic_func'])
     
     # Check if fit file exists.
     if not os.path.isfile(fitfile):
@@ -559,7 +559,7 @@ def plot_residuals(CONFIG):
     """ Plot fit residuals versus a given coordinate. """
     
     # Get options from the config file.
-    resids_weighted = CONFIG['PLOTTING']['resids_weighted']
+    resids_weighted = to_bool(CONFIG['PLOTTING']['resids_weighted'])
     #module_name = CONFIG['MODEL']['model']
     #model_name = module_name
     #modfile = model_name+'.model'

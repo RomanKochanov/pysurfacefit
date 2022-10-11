@@ -50,6 +50,8 @@ class Fitter:
         p = np.array(p); n_p = len(p) 
         self.__model__.__params__.set_values(p,active_only=True) # new format, active=True
         
+        #print('len(p)>>>',len(p))
+        
         # get total number of residuals and create resulting 1D array
         n_tot = sum([grp.length for grp in self.__fitgroups__ if grp.__active__])
         if self.__rubber_on__ is True:
@@ -60,27 +62,42 @@ class Fitter:
         # global residual index offset
         offset = 0
         
+        #print('self.__rubber_on__>>>',self.__rubber_on__)
+        #print('self.__rubber_on__ is True>>>',self.__rubber_on__ is True)
+        
         # do "rubber" first
         p_resids = p-self.__params_initial__.get_values(active_only=True) # unweighted
         resids_param = self.__wpmul__*self.__model__.__wp__*p_resids # weighted
         if self.__rubber_on__ is True:                        
             resids[offset:(offset+n_p)] = resids_param
+            #print('offset,offset+n_p>>>',offset,offset+n_p)
             offset += n_p
         
         # loop through the fit groups
         for grp in self.__fitgroups__:
+            #print('grp.__name__>>>',grp.__name__)
             if not grp.__active__: continue
             model_calc = self.__model__.calculate(grp.__inputgrid__)
+            # DEBUG
+            #m1,m2,m3 = grp.__inputgrid__.get_meshes(flat=True)
+            #print(np.array(list(zip(m1,m2,m3,model_calc,grp.__output__))))
+            #print('model_calc>>>',model_calc)
+            # //DEBUG
             grp.set_calc_vals(model_calc) # set calculated values for group
             grp.calculate_residuals()
             if self.__weighted_fit__==True:
                 resids[offset:(offset+grp.length)] = grp.__weighted_resids__.flatten()
             else:
                 resids[offset:(offset+grp.length)] = grp.__unweighted_resids__.flatten()
+            #print('offset,offset+grp.length>>>',offset,offset+grp.length)
             offset += grp.length
+        
+        #print('self.__weighted_fit__>>>',self.__weighted_fit__)
+        #print('np.max(np.abs(resids))>>>',np.max(np.abs(resids)))
         
         # output iteration statistics        
         sum_of_squares_tot = np.sum(resids**2)
+        # sum_of_squares_grp = np.sum(resids[n_p:]**2); print('sum_of_squares_grp>>>','%.9e'%sum_of_squares_grp)
         sum_of_squares_rub = np.sum(resids_param**2)
         if self.__icalcfun__%1==0:
             print('CALC FUN %5d>>>  DIST:%13.9e  SSE_RUB:%13.9e SSE_TOT:%13.9e %20s'%\
