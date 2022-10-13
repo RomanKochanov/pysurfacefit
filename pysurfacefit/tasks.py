@@ -94,9 +94,110 @@ def parse_input_columns(CONFIG):
     if colnames[-1]=='': colnames = colnames[:-1]
     return colnames
 
+def parse_semicolon_list(CONFIG,section,parameter,typ=str):
+    vals = [typ(c.strip()) for c in CONFIG[section][parameter].split(';')]
+    if vals[-1]=='': vals = vals[:-1]
+    return vals
+
+def split(CONFIG):
+    """ Split datafile according to the split scheme. """
+    
+    # Get the config options.
+    datafile = CONFIG['DATA']['datafile'].strip()
+    dataspec = CONFIG['DATA']['dataspec'].strip()
+    split_column = CONFIG['DATA']['split_column'].strip()
+    if not split_column: 
+        split_column = CONFIG['DATA']['output_column'].strip()
+    split_values = parse_semicolon_list(CONFIG,'DATA','split_values',typ=float)
+    split_weights = parse_semicolon_list(CONFIG,'DATA','split_weights',typ=float)
+    
+    print('Splitting data by %s'%split_column)
+    
+    col_data = j.import_csv(datafile)
+    
+    filename = os.path.basename(datafile)
+    filepath = os.path.dirname(datafile)
+    filestem,_ = os.path.splitext(filename)
+        
+    if not split_values:
+        cols = [col_data]
+        whts = [split_weights[0]] if split_weights else [1.0]
+    else:
+        cols = col_data.split(split_column,split_values)
+        whts = split_weights + [1.0 for _ in range(len(split_values)-len(split_weights))]
+        whts += [whts[-1]]
+        split_values += [None]
+        assert len(whts)==len(split_values)==len(split_values)
+
+    col_dataspec = j.Collection()
+
+    _,dataspec_ext = os.path.splitext(dataspec)
+    if dataspec_ext.lower()=='.txt':
+        dataspec_save_method = col_dataspec.export_fixcol
+    elif dataspec_ext.lower()=='.csv':
+        dataspec_save_method = col_dataspec.export_csv
+    else:
+        print('ERROR: unknown dataspec export format "%s"'%dataspec_ext)
+        sys.exit()
+    
+    print('Saving dataspec to ',dataspec)
+
+    if len(cols)==1:
+        col_dataspec.update({
+            'alias':filestem,
+            'path':datafile,   
+            'wht_mul':whts[0],    
+            'type':None,
+            'include':1,
+        })
+    else:
+        for i in range(len(split_values)):
+            
+            col_ = cols[i]
+            
+            npnts = len(col_.ids())
+            if npnts==0:
+                continue
+            
+            if i==0:
+                filestem_ = filestem+'__%g-%g'%(
+                    min(col_.getcol(split_column)),
+                    split_values[i],
+                )
+            elif i==len(split_values)-1:
+                filestem_ = filestem+'__%g-%g'%(
+                    split_values[i-1],
+                    max(col_.getcol(split_column)),
+                )
+            else:
+                filestem_ = filestem+'__%g-%g'%(
+                    split_values[i-1],
+                    split_values[i],
+                )
+                
+            datafile_ = os.path.join(filepath,filestem_+'.csv') 
+            
+            col_dataspec.update({
+                'alias': filestem_,
+                'path': datafile_,   
+                'wht_mul': whts[i],    
+                'type': None,
+                'npnts': npnts,
+                'include': 1,
+            })
+            
+            col_.export_csv(datafile_)
+    
+    col_dataspec.order = ['alias','path','wht_mul','type','npnts','include']
+    dataspec_save_method(dataspec)
+    print('...done')
+
 def parse_dataspec(CONFIG):
-    filename = CONFIG['DATA']['dataspec']
-    col_dataspec = j.import_fixcol(filename)
+    filename = CONFIG['DATA']['dataspec'].strip()
+    if filename:
+        col_dataspec = j.import_fixcol(filename)
+    else:
+        col_dataspec = j.Collection()
     return col_dataspec
 
 def read_fitgroups(CONFIG,verbose=False):
@@ -106,7 +207,8 @@ def read_fitgroups(CONFIG,verbose=False):
     col_data = j.Collection() # unified collection for plotting
 
     # Get the config options.
-    datafile = CONFIG['DATA']['datafile']
+    datafile = CONFIG['DATA']['datafile'].strip()
+    dataspec = CONFIG['DATA']['dataspec'].strip()
 
     # => input and output names
     INPUTS = parse_input_columns(CONFIG)
@@ -121,9 +223,14 @@ def read_fitgroups(CONFIG,verbose=False):
     # => weight functin for data
     wht_fun = eval( CONFIG['DATA']['wht_fun'] )
     
-    # First, accumulate all datafiles in one place
+    if not datafile and not dataspecfile:
+        print('ERROR: either datafile of dataspec should be non-empty.')
+        sys.exit()
+    
     col_dataspec = j.Collection()
-    if datafile:
+    # If dataspec is empty, treat datafile as a single data source:
+    if datafile and not dataspec:
+        print('Reading datafile ',datafile)
         col_dataspec.update({
             'alias':'default','path':datafile,
             'wht_mul':1.0,'type':None,'include':1})
@@ -143,7 +250,8 @@ def read_fitgroups(CONFIG,verbose=False):
         if verbose: print(fitgroup_name)
         if verbose: print('===============================')
         # Get points from the CSV file
-        col = j.Collection(); col.import_csv(fitgroup_path)
+        col = j.import_csv(fitgroup_path)
+        order = col.order
         # Apply data cutoff
         col = col.subset(col.ids(lambda v: GLOBAL_CUTOFF_MIN<=v[OUTPUT]<=GLOBAL_CUTOFF_MAX))
         # Get the data columns 
@@ -176,7 +284,9 @@ def read_fitgroups(CONFIG,verbose=False):
         col_data.update(col.getitems())
         # Append to groups of data
         GROUPS_DATA.append(GRP_DATA)
-        
+               
+    col_data.order = order
+               
     fitgroups = FitGroups(GROUPS_DATA)
     return fitgroups,col_data
 

@@ -8,6 +8,8 @@ import sympy as sy
 #import symengine as sy # should be faster than sympy, but not entirely compatible
 import numba as nb
 
+from tabulate import tabulate as tab
+
 from .base import Model
 
 def subprocess_run_crossplatform(command,*args,**kwargs):

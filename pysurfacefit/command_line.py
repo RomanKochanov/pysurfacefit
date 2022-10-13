@@ -10,7 +10,7 @@ def set_parameters(config,params):
     for param in params:
         param = param.strip()
         if not param: continue
-        path,val = param.split('=')
+        path,val = param.split(':')
         section,par = path.split('.')
         config[section][par] = val
 
@@ -39,34 +39,28 @@ def main():
         action='store_const', const=True, default=False,
         help='Stage 2: create model package')
 
-    #parser.add_argument('--initdata', dest='initdata',
-    #    action='store_const', const=True, default=False,
-    #    help='Stage 2: create data package')
-    #
-    #parser.add_argument('--initmodel', dest='initmodel',
-    #    action='store_const', const=True, default=False,
-    #    help='Stage 3: create model package')
+    parser.add_argument('--split', dest='split',
+        action='store_const', const=True, default=False,
+        help='Stage 3: split initial datafile with weighting scheme')
 
     parser.add_argument('--fit', dest='fit',
         action='store_const', const=True, default=False,
-        help='Stage 3: start fitting model to data')
+        help='Stage 4: start fitting model to data')
 
     parser.add_argument('--stat', dest='stat',
         action='store_const', const=True, default=False,
-        help='Stage 4: calculate statistics')
+        help='Stage 5: calculate statistics')
 
     parser.add_argument('--codegen', dest='codegen',
         action='store_const', const=True, default=False,
-        help='Stage 5: generate Fortran code for fitted model')
+        help='Stage 6: generate Fortran code for fitted model')
 
-#    parser.add_argument('--plot', dest='plot',
-#        action='store_const', const=True, default=False,
     parser.add_argument('--plot', nargs='*', type=str, 
-        help='Stage 6: plot sections of the model and compare to data')
+        help='Stage 7: plot sections of the model and compare to data')
 
     parser.add_argument('--calc', dest='calc',
         action='store_const', const=True, default=False,
-        help='Stage 7: calculate model values on grid')
+        help='Stage 8: calculate model values on grid')
 
     args = parser.parse_args() 
     
@@ -85,8 +79,8 @@ def main():
         CONFIG['GENERAL']['project'] = args.startproject
         if args.merge:
             CONFIG.load(args.merge,ignore_empty_values=True)
-        if args.set:
-            set_parameters(CONFIG,args.set)
+        #if args.set:
+        #    set_parameters(CONFIG,args.set)
         tasks.startproject(CONFIG)
     else:
         if not args.config:
@@ -94,12 +88,13 @@ def main():
             sys.exit()
         CONFIG.load(args.config)
         
+    if args.set:
+        set_parameters(CONFIG,args.set)
+        
     if args.init:
         tasks.init(CONFIG)
-#    if args.initdata:
-#        tasks.initdata(CONFIG)
-#    elif args.initmodel:
-#        tasks.initmodel(CONFIG)
+    elif args.split:
+        tasks.split(CONFIG)
     elif args.fit:
         tasks.fit(CONFIG)
     elif args.stat:

@@ -8,12 +8,20 @@ class Default(ConfigSection):
 # CSV file containing fitting data.
 {datafile}
 
-# Data specification file of the following format:
-# alias   path       wht_fun    filter   include
-# ------- ---------  ---------  -------  -------
-# test1   test1.csv  wht1       filter1  0       
-# test2   test2.csv  wht2       1
-# test3   test3.csv  wht3       1
+# Define rules to split the datafile to dataspec.
+# Should be ignored if dataspec is empty.
+{split_column}
+{split_values}
+{split_weights}
+
+# Resulting data specification split-file.
+# N.B.: if empty, then the raw datafile is used.
+# Data specification *.txt file has the following format:
+# alias   path       wht_mul   type    include
+# ------- ---------  --------  ------  -------
+# test1   test1.csv  1         0       1       
+# test2   test2.csv  1         0       1
+# test3   test3.csv  1         0       1
 {dataspec}
 
 # Names and units of the input data columns. 
