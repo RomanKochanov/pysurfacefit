@@ -646,6 +646,7 @@ def codegen(CONFIG):
     if compare_fortran:
         model.compile_fortran_90(compiler)
         calc_model_fortran = model.__function_fortran__(grid_compfort)
+        calc_model_fortran = np.squeeze(calc_model_fortran) # fixes bug when some dimensions are "degenerate"
         abs_err_compfort = np.abs(calc_model_python - calc_model_fortran)
         abs_err_compfort_min = np.min(abs_err_compfort)
         abs_err_compfort_max = np.max(abs_err_compfort)

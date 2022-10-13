@@ -208,6 +208,8 @@ def compile_gridcalc_fortran(model,compiler='gfortran'):
     params_list = ','.join(model.__input_names__)
     exefile = model.__class__.__name__
 
+    nparams = len(params_list)
+
     # Define the gridcalc function to return.
     def gridcalc(exefile,grid):
         # create grid file
@@ -247,7 +249,7 @@ def compile_gridcalc_fortran(model,compiler='gfortran'):
         '    exit' + '\n' + \
         '  endif' + '\n' + \
         '  call sympy_generated(res,%s)'%params_list + '\n' + \
-        '  write(2,\'(4E25.15)\') %s,res'%params_list + '\n' + \
+        '  write(2,\'(%dE25.15)\') %s,res'%(nparams+1,params_list) + '\n' + \
         'end do' + '\n' + \
         '200 continue' + '\n' + \
         'print *,\'end loop\'' + '\n\n' + \
