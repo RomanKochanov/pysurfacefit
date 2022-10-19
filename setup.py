@@ -11,10 +11,17 @@ setup(
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: GPL-3",
+        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    #install_requires=[],
+    install_requires=[
+        "numpy",
+        "numba",
+        "tabulate",
+        "scipy",
+        "matplotlib",
+        "jeanny3",
+    ],
     entry_points = {
         'console_scripts': ['pysurfacefit=pysurfacefit.command_line:main']
     }
