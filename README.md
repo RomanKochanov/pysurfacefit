@@ -42,7 +42,7 @@ Other custom optimization method backends are fairly easy to implement (see the 
 
 <h2>From Python Package index</h2>
 
-<em>To be done</em>
+pip install pysurfacefit
 
 <h1>PySurfaceFit CLI tool</h1>
 

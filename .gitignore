@@ -13,3 +13,5 @@ pysurfacefit.egg-info/
 
 tests/*
 !tests/*.py
+
+showcase/.ipynb_checkpoints
