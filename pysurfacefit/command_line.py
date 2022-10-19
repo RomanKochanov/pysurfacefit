@@ -81,6 +81,15 @@ def main():
             CONFIG.load(args.merge,ignore_empty_values=True)
         #if args.set:
         #    set_parameters(CONFIG,args.set)
+        # INPUT PARAMETERS
+        datafile = input('Enter the name of the data points CSV file: ')
+        CONFIG['DATA']['datafile'] = datafile
+        input_columns = input('Enter semicolon-separated names for model inputs: ')
+        CONFIG['DATA']['input_columns'] = input_columns
+        CONFIG['MODEL']['arguments'] = input_columns
+        output_column = input('Enter name for model output: ')
+        CONFIG['DATA']['output_column'] = output_column
+        # Run start project.
         tasks.startproject(CONFIG)
     else:
         if not args.config:
@@ -90,7 +99,7 @@ def main():
         
     if args.set:
         set_parameters(CONFIG,args.set)
-        
+               
     if args.init:
         tasks.init(CONFIG)
     elif args.split:
@@ -105,5 +114,5 @@ def main():
         if args.plot:
             CONFIG['PLOTTING']['gridspec'] = args.plot[0]
         tasks.plot(CONFIG)
-    elif args.calc is not None:
+    elif args.calc:        
         tasks.calc(CONFIG)

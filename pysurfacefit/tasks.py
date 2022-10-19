@@ -59,6 +59,7 @@ def create_dataspec(CONFIG):
     """ Create a sample Data Specification file. """
     project_dir = CONFIG['GENERAL']['project']
     filename = CONFIG['DATA']['dataspec']
+    datafile = CONFIG['DATA']['datafile']
     content = """//HEADER
 A alias str
 P path str
@@ -70,13 +71,33 @@ I include int
 A_________________P_______________________W__________T__________I______
 # type: 0/None -> data, -1 -> penalty down, 1 -> penalty up
 """
-    with open(os.path.join(project_dir,filename),'w') as f:
-        f.write(content)
+    if datafile:
+        filestem,_ = os.path.splitext(datafile)
+        content += """
+{filestem}            {datafile}            1.0         0         1
+""".format(filestem=filestem,datafile=datafile)
+    #with open(os.path.join(project_dir,filename),'w') as f:
+    #    f.write(content)
+        
+    col = j.Collection()
+    col.update([{
+        'alias': filestem,
+        'path': datafile,
+        'wht_mul': 1.0,
+        'type': 0,
+        'include': 1,
+    }])
+    col.order = ['alias','path','wht_mul','type','include']
+    col.export_fixcol(os.path.join(project_dir,filename))
+        
     return filename
 
 def startproject(CONFIG):
     project_dir = CONFIG['GENERAL']['project']
+    datafile = CONFIG['DATA']['datafile']
     create_dir(project_dir)
+    if datafile:
+        shutil.copy(datafile,os.path.join(project_dir,datafile)) 
     config_name = 'config.ini'
     config_path = os.path.join(project_dir,config_name)
     CONFIG.save(config_path)
@@ -223,7 +244,7 @@ def read_fitgroups(CONFIG,verbose=False):
     # => weight functin for data
     wht_fun = eval( CONFIG['DATA']['wht_fun'] )
     
-    if not datafile and not dataspecfile:
+    if not datafile and not dataspec:
         print('ERROR: either datafile of dataspec should be non-empty.')
         sys.exit()
     
@@ -238,6 +259,8 @@ def read_fitgroups(CONFIG,verbose=False):
     # Second, get fitgroups from the data in the csv file.
     col = parse_dataspec(CONFIG)
     col_dataspec.update(col.getitems())
+    
+    order = []
     
     GROUPS_DATA = []
     for item in col_dataspec.getitems():
@@ -266,7 +289,7 @@ def read_fitgroups(CONFIG,verbose=False):
         # Prepare fitting grid (list)
         grid = List(*reduce(lambda x,y:x+y,zip(INPUTS,input_columns))) # list-based grid
         # Prepare fitgroup for points
-        if fitgroup_type is None:
+        if fitgroup_type in ['', None, 0]:
             FitPointsType = FitPoints
         elif fitgroup_type==-1:
             FitPointsType = PenaltyPointsDown
