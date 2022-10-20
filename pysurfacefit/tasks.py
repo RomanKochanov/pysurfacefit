@@ -100,7 +100,7 @@ def startproject(CONFIG):
         shutil.copy(datafile,os.path.join(project_dir,datafile)) 
     config_name = 'config.ini'
     config_path = os.path.join(project_dir,config_name)
-    CONFIG.save(config_path)
+    CONFIG.save_ini(config_path)
     dataspec_file = create_dataspec(CONFIG)
     print('Created new project: %s'%project_dir)
     print('New config file has been added: %s'%config_path)

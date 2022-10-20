@@ -78,7 +78,7 @@ def main():
             CONFIG.merge_section(section)
         CONFIG['GENERAL']['project'] = args.startproject
         if args.merge:
-            CONFIG.load(args.merge,ignore_empty_values=True)
+            CONFIG.load_ini(args.merge,ignore_empty_values=True)
         #if args.set:
         #    set_parameters(CONFIG,args.set)
         # INPUT PARAMETERS
@@ -95,7 +95,7 @@ def main():
         if not args.config:
             print('Error: config must be specified (use --config option).')
             sys.exit()
-        CONFIG.load(args.config)
+        CONFIG.load_ini(args.config)
         
     if args.set:
         set_parameters(CONFIG,args.set)
