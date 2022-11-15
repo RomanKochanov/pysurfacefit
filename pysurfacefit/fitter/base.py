@@ -50,8 +50,9 @@ class Fitter:
         p = np.array(p); n_p = len(p) 
         self.__model__.__params__.set_values(p,active_only=True) # new format, active=True
         
+        print('ENTERING RESIDUALS')
         #print('len(p)>>>',len(p))
-        
+               
         # get total number of residuals and create resulting 1D array
         n_tot = sum([grp.length for grp in self.__fitgroups__ if grp.__active__])
         if self.__rubber_on__ is True:
@@ -72,19 +73,25 @@ class Fitter:
             resids[offset:(offset+n_p)] = resids_param
             #print('offset,offset+n_p>>>',offset,offset+n_p)
             offset += n_p
+            
+        print('RESIDUALS: loop through the fit groups')
         
         # loop through the fit groups
         for grp in self.__fitgroups__:
-            #print('grp.__name__>>>',grp.__name__)
+            #print('RESIDUALS: grp.__name__>>>',grp.__name__)
             if not grp.__active__: continue
+            #print('RESIDUALS: start calc on grid...')
             model_calc = self.__model__.calculate(grp.__inputgrid__)
+            #print('RESIDUALS: ...done')
             # DEBUG
             #m1,m2,m3 = grp.__inputgrid__.get_meshes(flat=True)
             #print(np.array(list(zip(m1,m2,m3,model_calc,grp.__output__))))
             #print('model_calc>>>',model_calc)
             # //DEBUG
+            #print('RESIDUALS: setting calc vals and calculating residuals...')
             grp.set_calc_vals(model_calc) # set calculated values for group
             grp.calculate_residuals()
+            #print('RESIDUALS: ...done')
             if self.__weighted_fit__==True:
                 resids[offset:(offset+grp.length)] = grp.__weighted_resids__.flatten()
             else:
@@ -94,6 +101,8 @@ class Fitter:
         
         #print('self.__weighted_fit__>>>',self.__weighted_fit__)
         #print('np.max(np.abs(resids))>>>',np.max(np.abs(resids)))
+        
+        #print('RESIDUALS: print statistics')
         
         # output iteration statistics        
         sum_of_squares_tot = np.sum(resids**2)
@@ -109,6 +118,8 @@ class Fitter:
         self.__fitgroups__.print_stat()
         print('===============================')
                 
+        #print('QUITTING RESIDUALS')
+                
         return resids
         
     def residuals_jac(self,p):   # SHOULD BE ADAPTED FOR PENALTY POINTS!!!
@@ -116,6 +127,8 @@ class Fitter:
         self.__icalcjac__ += 1
         p = np.array(p); n_p = len(p)        
         self.__model__.__params__.set_values(p,active_only=True) # new format, active=True
+        
+        #print('ENTERING RESIDUALS_JAC')
         
         # get total number of residuals and create resulting 2D matrix
         n_tot = sum([grp.length for grp in self.__fitgroups__ if grp.__active__])
@@ -133,14 +146,22 @@ class Fitter:
             resids[offset:(offset+n_p)] = resids_param
             offset += n_p       
         
+        #print('RESIDUALS_JAC: loop through the fit groups')
+        
         # loop through the fit groups
         for grp in self.__fitgroups__:
             if not grp.__active__: continue
+            #print('RESIDUALS_JAC: calculating jac on grid...')
             model_calc_jac = self.__model__.calculate_jac(grp.__inputgrid__) # calculate Jacobian, flatten the initial grid structure
-            model_calc_jac = np.vstack(model_calc_jac) # convert array of objects to 2D array of floats
+            #print('RESIDUALS_JAC: ...done')
+            #model_calc_jac = np.vstack(model_calc_jac) # convert array of objects to 2D array of floats; seems to be exsessive since vstack is already performed in calculate_jac
+            #print('RESIDUALS_JAC: calculating func on grid...')
             model_calc = self.__model__.calculate(grp.__inputgrid__) #this step can be omitted to gain some (presumably low) speed-up
+            #print('RESIDUALS_JAC: ...done')
+            #print('RESIDUALS_JAC: setting calc vals and calculating residuals...')
             grp.set_calc_vals(model_calc) # set calculated values for group; can be optimized as well by "caching"
             grp.calculate_residual_derivs()
+            #print('RESIDUALS_JAC: ...done')
             if self.__weighted_fit__==True:
                 resids[offset:(offset+grp.length)] = model_calc_jac * np.reshape(grp.__weighted_resid_derivs__.flatten(),[grp.length,1])
             else:
@@ -151,6 +172,8 @@ class Fitter:
         if self.__icalcjac__%1==0:
             p_resids = p-self.__params_initial__.get_values(active_only=True)
             print('CALC JAC %5d>>>  DIST:%13.9e'%(self.__icalcjac__,np.sqrt(np.sum(p_resids**2))))
+
+        #print('QUITTING RESIDUALS_JAC')
             
         return resids
         

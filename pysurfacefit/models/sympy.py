@@ -12,6 +12,8 @@ from tabulate import tabulate as tab
 
 from .base import Model
 
+FASTMATH = False
+
 def subprocess_run_crossplatform(command,*args,**kwargs):
     """ Wrapper for subprocess.run to enable basic cross-platform execution.
     ==============
@@ -297,22 +299,26 @@ class ModelSympy(Model):
         print('==========================================')
         print('Progress:')
         
-        # Create Sympy objects for inputs.
-        print('     - creating sympy objects for inputs')
+        # Get function argument names.
         argnames = get_argnames(self.__func__); argnames = list(argnames)
         argnames = argnames[2:] # omit "self" and "params" arguments
-        inputs_ = [sy.Symbol(argname,real=True) for argname in argnames]
+
+        # Create Sympy objects for inputs.
+        print('     - creating sympy objects for inputs')
+        Args = sy.IndexedBase('Args',real=True)
+        inputs_ = [Args[i] for i,_ in enumerate(argnames)]
         self.__symbolic_inputs__ = inputs_
         self.__input_names__ = argnames
+        self.__args_base__ = Args
         
         # Create Sympy objects for parameters.
         print('     - creating sympy objects for parameters')
-        #sympy_pars = [sy.Symbol(p.__name__,real=True) for p in self.__params__ if p.__flag__] # ONLY ACTIVE PARAMETERS
-        sympy_pars = [sy.Symbol(p.__name__,real=True) for p in self.__params__]
+        Params = sy.IndexedBase('Params',real=True)
+        sympy_pars = [Params[i] for i,_ in enumerate(self.__params__)]
         params_ = copy.deepcopy(self.__params__)
-        #params_.set_values(sympy_pars,active_only=True) # ONLY ACTIVE PARAMETERS
         params_.set_values(sympy_pars,active_only=False)
         self.__symbolic_params__ = params_
+        self.__params_base__ = Params
         
         # Get the Sympy expression by calling function with the Sympy objects.
         print('     - get the Sympy expression by calling function with the Sympy objects')
@@ -320,28 +326,36 @@ class ModelSympy(Model):
         
         # Create lambdified Python function from sympy expression.
         print('     - create lambdified Python function from sympy expression')
-        args_lambdify = [psym.get_value() for psym in self.__symbolic_params__]+self.__symbolic_inputs__
+        args_lambdify = [Args,Params] # much more simple, isn't it?
         self.__lambdified_func__ = sy.lambdify(args_lambdify,self.__symbolic_func__)
         
         # Create compiled (numbified) code from the lambdified function.
         print('     - create compiled (numbified) code from the lambdified function')
-        self.__numbified_func__ = nb.njit(self.__lambdified_func__)
+        self.__numbified_func__ = nb.njit(self.__lambdified_func__,fastmath=FASTMATH)
         
         print('==========================================\n')
                 
     def __calc_symbolic__(self,params,*inputs): # symbolic expression->numeric result (through substitution) ONLY FOR DEBUGING PURPOSES, VERY SLOW!!!
-        dct = {psym.get_value():params[psym.__name__].get_value() for psym in self.__symbolic_params__} # parameters substitution
+        #dct = {psym.get_value():params[psym.__name__].get_value() for psym in self.__symbolic_params__} # parameters substitution
+        dct = {}
+        for psym,pnum in zip(self.__symbolic_params__,self.__params__):
+            dct[psym.get_value()] = pnum.get_value()
         dct.update({v:inp for v,inp in zip(self.__symbolic_inputs__,inputs)})
         expr_sub = self.__symbolic_func__.subs(dct) # substitute parameters and inputs        
         return expr_sub.evalf()
 
     def __calc_lambdified__(self,params,*inputs): # lambdified expression->numeric result
-        args = [p.get_value() for p in params]+list(inputs)
-        return self.__lambdified_func__(*args)
+        #args = [p.get_value() for p in params]+list(inputs)
+        #return self.__lambdified_func__(*args)
+        pars = [p.get_value() for p in params]
+        return self.__lambdified_func__(inputs,pars)
 
     def __calc_numbified__(self,params,*inputs): # compiled lambdified expression->numeric result
-        args = [p.get_value() for p in params]+list(inputs)
-        return self.__numbified_func__(*args)
+        #args = [p.get_value() for p in params]+list(inputs)
+        #return self.__numbified_func__(*args)
+        pars = np.array([p.get_value() for p in params])
+        inputs = np.array(inputs)
+        return self.__numbified_func__(inputs,pars)
         
     def calculate_components(self,grid,compnames=[]): # calculate model and it's components on grid
         def func_comp(*x):
@@ -353,7 +367,7 @@ class ModelSympy(Model):
             #comps = [comp.evalf() for comp in comps]   # WORKS FINE WITHOUT THIS??????
             # return evaluated components
             return [res,*comps]
-        hypermesh = grid.calculate(func_comp,dtype=object)
+        hypermesh = grid.calculate(func_comp,dtype=object,numba=False)
         meshes = [np.empty(hypermesh.shape,dtype=np.float64) for _ in range(len(compnames)+1)]
         for k,_ in enumerate(meshes):
             for i,_ in np.ndenumerate(hypermesh):
@@ -386,10 +400,26 @@ class ModelSympy(Model):
             return self.__calc_symbolic__(params,*inputs)
         elif self.__calc_switch__ == 'lambdified':
             return self.__calc_lambdified__(params,*inputs)
-        elif self.__calc_switch__ == 'numbified':
+        elif self.__calc_switch__ in ['numbified','numbified_parallel']:
             return self.__calc_numbified__(params,*inputs)
         else:
             raise Exception('unknown calc option "%s"'%self.__calc_switch__)
+            
+    def calculate(self,grid): # if using numbified function, use the parallel grids, otherwise fall back to parent's method
+        if self.__calc_switch__ == 'numbified_parallel':
+            # initialize and compile func
+            if '__initialized_func__' not in self.__dict__ or self.__initialized_func__ is False:
+                self.__sympy_initialize_func__()
+                self.__initialized_func__ = True
+                # compile func (can be dangerous since we don't know the input requirements)
+                print('compiling model func...')
+                self.__calc_numbified__(self.__params__,*list(np.random.random(len(self.__input_names__))))
+                print('...done')
+            # calculate with parallel grid
+            pars = self.__params__.get_values()
+            return grid.calculate(self.__numbified_func__,parameters=pars,numba=True)
+        else:
+            return Model.calculate(self,grid) # use __calc__
 
     ##########################################################
     ################# CALCULATE JACOBIAN #####################
@@ -401,22 +431,24 @@ class ModelSympy(Model):
         print('<<<< calling __sympy_initialize_jac__ >>>>')
         print('==========================================')
         print('Progress:')
-                
+
         # Get the Sympy expression for jacobian from __symbolic_func__.
         print('     - get the Sympy expression by calling function with the Sympy objects')
-        #sympy_pars = [spar.get_value() for spar in self.__symbolic_params__] # ALL PARAMETERS (CAN BE INEFFICIENT IF THE ACTIVE SUBSET IS MUCH SMALLER THAT THE TOTAL PARAMETER SET)
         sympy_pars = [spar.get_value() for spar in self.__symbolic_params__ if spar.__flag__] # !!! ONLY ACTIVE PARAMETERS (CAN CAUSE ERRORS IF THE ACTIVE SUBSET CHANGES WITHIN ONE SESSION)
         self.__symbolic_jac__ = gradient(self.__symbolic_func__,sympy_pars) # symbolic jacobian with respect to all parameters
-        
+
         # Create lambdified Python function from sympy expression.
         print('     - create lambdified Python function from sympy expression')
-        args_lambdify = [psym.get_value() for psym in self.__symbolic_params__]+self.__symbolic_inputs__
+        args_lambdify = [self.__args_base__,self.__params_base__] # much more simple, isn't it?
         self.__lambdified_jac__ = sy.lambdify(args_lambdify,self.__symbolic_jac__)
-        
-        
+
         # Create compiled (numbified) code from the lambdified function.
         print('     - create compiled (numbified) code from the lambdified function')
-        self.__numbified_jac__ = nb.njit(self.__lambdified_jac__)
+        numbified_jac = nb.njit(self.__lambdified_jac__,fastmath=FASTMATH)
+        @nb.njit(fastmath=FASTMATH)
+        def jac_(args,pars):
+            return numbified_jac(args,pars)[0]
+        self.__numbified_jac__ = jac_
         
         print('==========================================\n')
         
@@ -431,8 +463,11 @@ class ModelSympy(Model):
         return self.__lambdified_jac__(*args)[0]
 
     def __jac_numbified__(self,params,*inputs): # compiled lambdified expression->numeric result
-        args = [p.get_value() for p in params]+list(inputs)
-        return self.__numbified_jac__(*args)[0]
+        #args = [p.get_value() for p in params]+list(inputs)
+        #return self.__numbified_jac__(*args)
+        pars = np.array([p.get_value() for p in params])
+        inputs = np.array(inputs)
+        return self.__numbified_jac__(inputs,pars)
         
     def __jac__(self,params,*inputs): 
         # check for the jacobian initialization
@@ -445,11 +480,30 @@ class ModelSympy(Model):
             return self.__jac_symbolic__(params,*inputs)
         elif self.__calc_switch__ == 'lambdified':
             return self.__jac_lambdified__(params,*inputs)
-        elif self.__calc_switch__ == 'numbified':
+        elif self.__calc_switch__ in ['numbified','numbified_parallel']:
             return self.__jac_numbified__(params,*inputs)
         else:
             raise Exception('unknown calc option "%s"'%self.__calc_switch__)            
-            
+
+    def calculate_jac(self,grid):# if using numbified function, use the parallel grids, otherwise fall back to parent's method
+        if self.__calc_switch__ == 'numbified_parallel':
+            # initialize and compile jac
+            if '__initialized_jac__' not in self.__dict__ or self.__initialized_jac__ is False:
+                self.__sympy_initialize_jac__()
+                self.__initialized_jac__ = True
+                # compile jac (can be dangerous since we don't know the input requirements)
+                print('compiling model jac...')
+                self.__jac_numbified__(self.__params__,*list(np.random.random(len(self.__input_names__))))
+                print('...done')
+            # calculate with parallel grid
+            pars = self.__params__.get_values(active_only=False)
+            pars_active = self.__params__.get_values(active_only=True)
+            n_active_pars = len(pars_active)
+            return grid.calculate(self.__numbified_jac__,parameters=pars,
+                dimension=n_active_pars,flat=True,squeeze=False,numba=True)
+        else:
+            return Model.calculate_jac(self,grid) # use __jac__
+        
     ##########################################################
     ############# CHECK FUNCTION CALCULATION  ################
     ##########################################################
@@ -566,7 +620,7 @@ class ModelSympy(Model):
 #        self.__function_fortran__ = compile_gridcalc_fortran(self,expr_sub_f90)
 #        raise NotImplementedError # create a stub for this method
 #        #return code
-        
+              
 # ===============================================================================
 # ================================ MODEL SYMPY ==================================
 # ===============================================================================

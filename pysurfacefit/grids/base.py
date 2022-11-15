@@ -1,5 +1,8 @@
 import numpy as np
 
+from numba import njit, prange, config
+from functools import reduce
+
 def assert_(desc,vars):
     assert set(vars) not in set(desc.keys()),\
             'name mismatch'
@@ -10,6 +13,37 @@ def flatten(*args):
     else:
         return [_.flatten() for _ in args]
         
+#config.THREADING_LAYER = 'threadsafe'
+FASTMATH = False
+PARALLEL = True
+
+@njit(parallel=PARALLEL,fastmath=FASTMATH)
+def calc_on_grid_numba_vector(meshes,func,parameters,length,dimension):
+    """ calculate vector function on parallel grid """
+    res = np.empty((length,dimension),dtype=np.float64)
+    nargs = meshes.shape[1]    
+    for i in prange(length):
+        args = np.empty(nargs)
+        for j in range(nargs):
+            args[j] = meshes[i,j]
+        out = func(args,parameters)
+        for k in range(dimension):
+            res[i,k] = out[k]                
+    return res
+
+@njit(parallel=PARALLEL,fastmath=FASTMATH)
+def calc_on_grid_numba_scalar(meshes,func,parameters,length):
+    """ calculate scalar function on parallel grid """
+    res = np.empty(length,dtype=np.float64)
+    nargs = meshes.shape[1]
+    for i in prange(length):
+        args = np.empty(nargs)
+        for j in range(nargs):
+            args[j] = meshes[i,j]
+        out = func(args,parameters)
+        res[i] = out
+    return res
+
 class Grid:
     """
     desc: {'v1':grid1, 'v2':grid2 ...}
@@ -46,16 +80,34 @@ class Grid:
         else:
             return [mesh[ind] for mesh in meshes]
                                     
-    def calculate(self,func,flat=False,squeeze=True,dtype=np.float64): # calculate arbitrary function on the grid; SEEMS IT CAN BE NUMBIFIED! (ndenumerate IS SUPPORTED BY NUMBA)        
-        meshes = self.__meshes__
-        res = np.empty(meshes[0].shape,dtype=dtype)
-        for i,_ in np.ndenumerate(res): # np.ndenumerate, np.nditer
-            arg = [mesh[i] for mesh in meshes]
-            res[i] = func(*arg)
-        if flat:
-            res = flatten(res)
+    def calculate(self,func,parameters=[],dimension=1,numba=False,
+        flat=False,squeeze=True,dtype=np.float64): # calculate arbitrary function on the grid;         
+        
+        if numba:
+
+            shape = self.__meshes__[0].shape
+            meshes = np.array([mesh.flatten() for mesh in self.__meshes__]).T
+            length = reduce(lambda x,y:x*y,shape)
+            if dimension==1:
+                res = calc_on_grid_numba_scalar(meshes,func,parameters,length)
+            else:
+                res = calc_on_grid_numba_vector(meshes,func,parameters,length,dimension)
+            if not flat:
+                res = np.reshape(res,shape)
+            
+        else:
+        
+            meshes = self.__meshes__
+            res = np.empty(meshes[0].shape,dtype=dtype)
+            for i,_ in np.ndenumerate(res): # np.ndenumerate, np.nditer
+                arg = [mesh[i] for mesh in meshes]
+                res[i] = func(*arg)
+            if flat:
+                res = flatten(res)
+                
         if squeeze:
             res = np.squeeze(res)
+                
         return res
         
 class List:
@@ -88,10 +140,29 @@ class List:
         else:
             return [mesh[ind] for mesh in meshes]
                                     
-    def calculate(self,func,flat=False,dtype=np.float64): # calculate arbitrary function on the grid; SEEMS IT CAN BE NUMBIFIED! (ndenumerate IS SUPPORTED BY NUMBA)
-        meshes = self.__meshes__
-        res = np.empty(meshes[0].shape,dtype=dtype)
-        for i,_ in np.ndenumerate(res): # np.ndenumerate, np.nditer
-            arg = [mesh[i] for mesh in meshes]            
-            res[i] = func(*arg)
+    def calculate(self,func,parameters=[],dimension=1,numba=False,
+        flat=False,squeeze=True,dtype=np.float64): # calculate arbitrary function on the grid; SEEMS IT CAN BE NUMBIFIED! (ndenumerate IS SUPPORTED BY NUMBA)
+        
+        if numba:
+
+            shape = self.__meshes__[0].shape
+            meshes = np.array([mesh.flatten() for mesh in self.__meshes__]).T
+            length = reduce(lambda x,y:x*y,shape)
+            if dimension==1:
+                res = calc_on_grid_numba_scalar(meshes,func,parameters,length)
+            else:
+                res = calc_on_grid_numba_vector(meshes,func,parameters,length,dimension)
+            
+        else:
+        
+            meshes = self.__meshes__
+            res = np.empty(meshes[0].shape,dtype=dtype)
+            for i,_ in np.ndenumerate(res): # np.ndenumerate, np.nditer
+                arg = [mesh[i] for mesh in meshes]
+                res[i] = func(*arg)
+                                
         return res
+        
+        
+        
+        
