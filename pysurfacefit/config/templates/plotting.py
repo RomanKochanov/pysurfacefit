@@ -14,7 +14,13 @@ class Default(ConfigSection):
 #           plot unweighted fit residuals.
 #   => "sections": 
 #           plot sections/cuts of the fitted model vs datapoints.
+#   => "history":
+#           plot fitting history for each data group.
 {plot_mode}
+
+# MIN_WHT_RES; MAX_WHT_RES; MIN_UNWHT_RES; MAX_UNWHT_RES; WHT_SSE; UNWHT_SSE; WHT_SD; UNWHT_SD
+{fit_history_stat}
+{fit_history_logscale} 
 
 # Plot coordinate grid specifications.
 # Format of the specification must be as follows: 
@@ -51,6 +57,8 @@ class Default(ConfigSection):
 {surface_opacity}
 """
     plot_mode = 'residuals'
+    fit_history_stat = 'WHT_SSE'
+    fit_history_logscale = True
     scatter_opacity = 1
     resize_by_weights = False
     surface_opacity = 0.4

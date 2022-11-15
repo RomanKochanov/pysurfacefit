@@ -756,8 +756,18 @@ def plot_residuals(CONFIG):
     
     plt.show()    
 
-COLORS = ['blue','red','green','magenta','black','cyan',
-    'yellow','purple','orange','brown','pink','grey']
+#COLORS = ['blue','red','green','magenta','black','cyan',
+#    'yellow','purple','orange','brown','pink','grey',]
+
+MARKERS = ['o','v','^','<','>','s','p','P','*','+','x','D','d']
+
+COLORS = ['blue', 'green', 'red', 'black', 'cyan', 
+'magenta', 'indigo', 'chartreuse', 'yellow', 'chocolate', 'aqua', 'aquamarine', 'azure', 'beige', 'brown', 
+'crimson', 'darkblue', 'darkgreen', 'fuchsia', 'gold', 'goldenrod', 
+'grey', 'ivory', 'coral', 'khaki', 'lavender', 'lightblue', 'lightgreen', 'lime', 
+'maroon', 'navy', 'olive', 'orange', 'orangered', 'orchid', 'pink', 'plum', 
+'purple', 'salmon', 'sienna', 'silver', 'tan', 'teal', 'tomato', 'turquoise', 
+'violet', 'wheat', 'yellowgreen']
 
 def get_argument_bindings(CONFIG):
     """
@@ -955,7 +965,55 @@ def plot_sections(CONFIG):
 
     plt.grid(True)
     plt.show()
+
+def plot_fit_history(CONFIG):
+    """ Plot fitting history for each data group. """
+
+    # Get options from the config file.
+    model_name = CONFIG['MODEL']['model']
+    fit_history_stat = CONFIG['PLOTTING']['fit_history_stat']
+    fit_history_logscale = to_bool( CONFIG['PLOTTING']['fit_history_logscale'] )
     
+    # Open history file in JSON format.
+    with open(model_name+'.fit_history') as f:
+        fit_history = json.load(f)
+            
+    # Start plotting.
+    GROUPS = {}
+    
+    for niter,global_item in enumerate(fit_history):
+        stat_dicthash = global_item['stat_dicthash']
+        for key in stat_dicthash:
+            group_item = stat_dicthash[key]
+            group_name = group_item['GROUP']
+            val = group_item[fit_history_stat]
+            if group_name not in GROUPS:
+                GROUPS[group_name] = [(niter,val)]
+            else:
+                GROUPS[group_name].append((niter,val))
+    
+    leg = []
+    
+    for group_name,marker,color in zip(
+        list(GROUPS.keys()),
+        cycle(MARKERS),
+        cycle(COLORS)
+        ):
+        
+        pairs = GROUPS[group_name]
+        #pairs = sorted(pairs)
+        niters,vals = list(zip(*pairs))
+        pl.plot(niters,vals,marker+'-',color=color)
+        leg.append(group_name)
+    
+    pl.xlabel('N_iter')
+    pl.ylabel(fit_history_stat)
+    pl.title('History for '+fit_history_stat)
+    pl.legend(leg)
+    pl.grid(True)
+    if fit_history_logscale: pl.yscale('log')
+    pl.show()
+
 def plot(CONFIG):
     """ interface for the plotting section. Supports a number of standard plots. """
     
@@ -967,6 +1025,8 @@ def plot(CONFIG):
         plot_residuals(CONFIG)
     elif plot_mode=='sections':
         plot_sections(CONFIG)
+    elif plot_mode=='history':
+        plot_fit_history(CONFIG)
     else:
         print('ERROR: unknown plotting mode "%s"'%plot_mode)
         sys.exit()

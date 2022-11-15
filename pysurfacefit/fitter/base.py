@@ -6,6 +6,18 @@ from scipy import optimize as opt
 import numpy as np
 from numpy.linalg import pinv, inv
 
+import jeanny3 as j
+
+# default encoder to save numpy types to JSON file
+def JSONDefault(obj):
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    raise TypeError ("Type %s not serializable" % type(obj))
+
 # ===============================================================================
 # ================================== FITTER =====================================
 # ===============================================================================
@@ -31,6 +43,7 @@ class Fitter:
         self.__wpmul__ = wpmul
         self.__weighted_fit__ = weighted
         self.__rubber_on__ = rubber_on
+        self.__fit_history__ = j.Collection()
         # FIT OPTIONS
         self.__options__ = {} # Nelder-Mead Powell CG BFGS Newton-CG L-BFGS-B TNC COBYLA SLSQP trust-constr dogleg trust-ncg trust-exact trust-krylov
         self.__options__.update(argv)
@@ -50,7 +63,7 @@ class Fitter:
         p = np.array(p); n_p = len(p) 
         self.__model__.__params__.set_values(p,active_only=True) # new format, active=True
         
-        print('ENTERING RESIDUALS')
+        #print('ENTERING RESIDUALS')
         #print('len(p)>>>',len(p))
                
         # get total number of residuals and create resulting 1D array
@@ -74,7 +87,7 @@ class Fitter:
             #print('offset,offset+n_p>>>',offset,offset+n_p)
             offset += n_p
             
-        print('RESIDUALS: loop through the fit groups')
+        #print('RESIDUALS: loop through the fit groups')
         
         # loop through the fit groups
         for grp in self.__fitgroups__:
@@ -133,6 +146,12 @@ class Fitter:
         print('===============================')
                 
         #print('QUITTING RESIDUALS')
+        
+        # Save history item to fit history collection.
+        history_item = {}
+        history_item['stat_dicthash'] = copy.deepcopy(stat.__dicthash__)
+        history_item['params_dicthash'] = copy.deepcopy(self.__model__.__params__.__dicthash__)
+        self.__fit_history__.update(history_item)
                 
         return resids
         
@@ -274,6 +293,9 @@ class Fitter:
         self.__result__ = res
         # create model final
         self.model_final = self.__model__ # create a link instead of a separate object
+        # save fit history
+        self.__fit_history__.export_json_list(
+            self.__model__.__class__.__name__+'.fit_history',default=JSONDefault)
         
     @property
     def model_initial(self):
