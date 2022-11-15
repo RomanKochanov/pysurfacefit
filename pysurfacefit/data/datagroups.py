@@ -45,13 +45,29 @@ class FitGroups:
             wht_sd = np.sqrt(wht_sse/grp.length)
             unwht_sd = np.sqrt(unwht_sse/grp.length)
             N = np.prod(weighted_resids.shape)
+            min_wht_res = np.min(weighted_resids)
+            max_wht_res = np.max(weighted_resids)
+            min_unwht_res = np.min(unweighted_resids)
+            max_unwht_res = np.max(unweighted_resids)
             #print('%30s:   N:%5d   MIN_WHT: %5.1e   MAX_WHT: %5.1e   WHT_SSE: %7.3e   UNWHT_SSE: %7.3e   WHT_SD: %7.3e   UNWHT_SD: %7.3e'%\
             #(grp.__name__,N,min_wht,max_wht,wht_sse,unwht_sse,wht_sd,unwht_sd))
-            item = {'GROUP':grp.__name__,'N':N,'MIN_WHT':min_wht,
-                'MAX_WHT':max_wht,'WHT_SSE':wht_sse,'UNWHT_SSE':unwht_sse,
-                'WHT_SD':wht_sd,'UNWHT_SD':unwht_sd}
+            item = {
+                'GROUP':grp.__name__,
+                'N':N,
+                'MIN_WHT':min_wht,
+                'MAX_WHT':max_wht,
+                'MIN_WHT_RES':min_wht_res,
+                'MAX_WHT_RES':max_wht_res,
+                'MIN_UNWHT_RES':min_unwht_res,
+                'MAX_UNWHT_RES':max_unwht_res,
+                'WHT_SSE':wht_sse,
+                'UNWHT_SSE':unwht_sse,
+                'WHT_SD':wht_sd,
+                'UNWHT_SD':unwht_sd
+            }
             stat.update(item)
-        stat.order = ['GROUP','N','MIN_WHT','MAX_WHT','WHT_SSE','UNWHT_SSE','WHT_SD','UNWHT_SD']
+        stat.order = ['GROUP','N','MIN_WHT','MAX_WHT','MIN_WHT_RES','MAX_WHT_RES',
+            'MIN_UNWHT_RES','MAX_UNWHT_RES','WHT_SSE','UNWHT_SSE','WHT_SD','UNWHT_SD']
         return stat
             
 #            sse_tot += wht_sse

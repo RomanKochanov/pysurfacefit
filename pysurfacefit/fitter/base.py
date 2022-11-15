@@ -117,8 +117,19 @@ class Fitter:
         print('=====data group statistics=====')
         stat = self.__fitgroups__.get_group_stats()
         stat.tabulate(floatfmt=[
-        #   GROUP  N       MIN_WHT  MAX_WHT  WHT_SSE  UNWHT_SSE  WHT_SD   UNWHT_SD
-            None, '5.0f', '5.1e',   '5.1e',  '7.3e',  '7.3e',    '7.3e',  '7.3e'])
+            None,   # GROUP 
+            '5.0f', # N   
+            '5.1e', # MIN_WHT 
+            '5.1e', # MAX_WHT  
+            '7.3e', # MIN_WHT_RES, 
+            '7.3e', # MAX_WHT_RES,  
+            '7.3e', # MIN_UNWHT_RES, 
+            '7.3e', # MAX_UNWHT_RES
+            '7.3e', # WHT_SSE  
+            '7.3e', # UNWHT_SSE 
+            '7.3e', # WHT_SD   
+            '7.3e', # UNWHT_SD 
+        ])
         print('===============================')
                 
         #print('QUITTING RESIDUALS')
