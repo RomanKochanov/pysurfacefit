@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.linalg import pinv, inv
+import jeanny3 as j
 
 # ===============================================================================
 # =========================== FIT AND PENALTY POINTS ============================
@@ -29,8 +30,9 @@ class FitGroups:
         self.__index__[grp.__name__] = len(self.__grps__)
         self.__grps__.append(grp)
     
-    def print_stat(self):
+    def get_group_stats(self):
         sse_tot = 0
+        stat = j.Collection()
         for grp in self.__grps__:
             if not grp.__active__: continue
             weighted_resids = grp.__weighted_resids__
@@ -43,8 +45,14 @@ class FitGroups:
             wht_sd = np.sqrt(wht_sse/grp.length)
             unwht_sd = np.sqrt(unwht_sse/grp.length)
             N = np.prod(weighted_resids.shape)
-            print('%30s:   N:%5d   MIN_WHT: %5.1e   MAX_WHT: %5.1e   WHT_SSE: %7.3e   UNWHT_SSE: %7.3e   WHT_SD: %7.3e   UNWHT_SD: %7.3e'%\
-            (grp.__name__,N,min_wht,max_wht,wht_sse,unwht_sse,wht_sd,unwht_sd))
+            #print('%30s:   N:%5d   MIN_WHT: %5.1e   MAX_WHT: %5.1e   WHT_SSE: %7.3e   UNWHT_SSE: %7.3e   WHT_SD: %7.3e   UNWHT_SD: %7.3e'%\
+            #(grp.__name__,N,min_wht,max_wht,wht_sse,unwht_sse,wht_sd,unwht_sd))
+            item = {'GROUP':grp.__name__,'N':N,'MIN_WHT':min_wht,
+                'MAX_WHT':max_wht,'WHT_SSE':wht_sse,'UNWHT_SSE':unwht_sse,
+                'WHT_SD':wht_sd,'UNWHT_SD':unwht_sd}
+            stat.update(item)
+        stat.order = ['GROUP','N','MIN_WHT','MAX_WHT','WHT_SSE','UNWHT_SSE','WHT_SD','UNWHT_SD']
+        return stat
             
 #            sse_tot += wht_sse
 #        print('datagroups->sse_tot>>>','%.9e'%sse_tot)

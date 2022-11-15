@@ -115,7 +115,10 @@ class Fitter:
                   '==> WEIGHTED_FIT' if self.__weighted_fit__ else '==> UNWEINGHTED_FIT'
                   ))
         print('=====data group statistics=====')
-        self.__fitgroups__.print_stat()
+        stat = self.__fitgroups__.get_group_stats()
+        stat.tabulate(floatfmt=[
+        #   GROUP  N       MIN_WHT  MAX_WHT  WHT_SSE  UNWHT_SSE  WHT_SD   UNWHT_SD
+            None, '5.0f', '5.1e',   '5.1e',  '7.3e',  '7.3e',    '7.3e',  '7.3e'])
         print('===============================')
                 
         #print('QUITTING RESIDUALS')
