@@ -507,11 +507,28 @@ def fit(CONFIG):
     #serialize_model(f.model_final,modelfile)
     f.model_final.save_params(model.__class__.__name__+'.csv')
     
+    # Save statistics.
+    save_statistics(CONFIG,f)
+    
 ##############
 #### STAT ####
 ##############
-    
-def stat(CONFIG):
+
+def save_fitpar_statistics(CONFIG,VARSPACE,output=sys.stdout):
+    pass
+
+def save_group_statistics(CONFIG,VARSPACE,output=sys.stdout):
+    pass
+
+def save_lbl_statistics(CONFIG,VARSPACE,output=sys.stdout):
+    pass
+
+def save_statistics(CONFIG,VARSPACE,output=sys.stdout):
+    save_fitpar_statistics(CONFIG,VARSPACE,output=output)
+    save_group_statistics(CONFIG,VARSPACE,output=output)
+    save_lbl_statistics(CONFIG,VARSPACE,output=output)
+
+def stat(CONFIG): # OBSOLETE!!! DELETE THIS FUNCTION
     """ Calculate fit statustics """
     
     # Get options from the config file.
