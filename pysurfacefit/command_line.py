@@ -99,7 +99,7 @@ def main():
         
     if args.set:
         set_parameters(CONFIG,args.set)
-               
+    
     if args.init:
         tasks.init(CONFIG)
     elif args.split:

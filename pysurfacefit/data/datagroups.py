@@ -24,7 +24,12 @@ class FitGroups:
         return len(self.__grps__)
         
     def __iter__(self):
-        return iter(self.__grps__)        
+        return iter(self.__grps__)     
+        
+    @property
+    def length(self):
+        n_tot = sum([grp.length for grp in self.__fitgroups__ if grp.__active__])
+        return n_tot
 
     def add_group(self,grp): 
         self.__index__[grp.__name__] = len(self.__grps__)
@@ -73,6 +78,14 @@ class FitGroups:
 #            sse_tot += wht_sse
 #        print('datagroups->sse_tot>>>','%.9e'%sse_tot)
             
+    def split_array(self,array,name):
+        """ Split array between groups """
+        offset = 0
+        for grp in self.__grps__:
+            if not grp.__active__: continue
+            setattr(grp,name,array[offset:(offset+grp.length)])
+            offset += grp.length
+            
     def split_global_jacobian(self,jac):
         """
         Split "global" Jacobian matrix between the active groups.
@@ -83,6 +96,81 @@ class FitGroups:
             if not grp.__active__: continue
             grp.__jacobian__ = jac[offset:(offset+grp.length)]
             offset += grp.length
+            
+    def collect_resids(self):
+        """ Collect residuals from groups for outlier statistics """
+        n_tot = sum([grp.length for grp in self.__fitgroups__ if grp.__active__])
+        self.__weighted_residuals__ = np.zeros(n_tot)
+        self.__unweighted_residuals__ = np.zeros(n_tot)
+        offset = 0
+        for grp in self.__grps__:
+            if not grp.__active__: continue
+            self.__weighted_residuals__[offset:(offset+grp.length)] = grp.__weighted_residuals__
+            self.__unweighted_residuals__[offset:(offset+grp.length)] = grp.__unweighted_residuals__
+            offset += grp.length 
+                   
+    def calculate_outlier_statistics(self,jac):
+        """Calculate useful fit statistics (cook, jackknife etc...).
+           For some of the statistics Jacobian matrix is required.
+           
+           Used the following references:
+           https://en.wikipedia.org/wiki/Leverage_(statistics)
+           https://en.wikipedia.org/wiki/Studentized_residual
+           https://en.wikipedia.org/wiki/DFFITS
+           https://www.mathworks.com/help/stats/cooks-distance.html
+           """
+           
+        self.collect_resids() # collect residuals
+        self.load_jacobian() # load cached Jacobian
+
+        #n = X.shape[0] # number of observables
+        #m = X.shape[1] # number of free parameters
+        n = self.length
+        m = jac.shape[1]
+           
+        #X = self.__jacobian__ 
+        X = jac[:n]
+        
+        eps = self.__weighted_resids__; eps = eps.flatten() # !!!! IF FLATTEN IS OMITTED, THEN DIMENSIONALITY MISMATCH OCCURS; ANOTHER WAY OF SOLVING THIS IS TO KEEP THE ORIGINAL DIMENSIONALITY (TODO!!!!)
+        eps2 = eps**2
+        sse = np.sum(eps2) # sum of squares error
+        mse = sse/n # mean squared error
+           
+        # Calculate Hat matrix
+        H = X @ pinv(X.T @ X) @ X.T # !!! using generalized inversion (pinv) since rank(X)<n_p
+        
+        # Leverages
+        leverage = np.diag(H)
+        self.__leverage__ = leverage
+        
+        # Studentized residuals (weighted)
+        sigma2 = 1/(n-m)*sse
+        T = eps/(np.sqrt(sigma2)*np.sqrt(1-leverage))
+        self.__weighted_studentized_resids__ = T
+        
+        # DFFITS
+        DFFITS = T*np.sqrt(leverage/(1-leverage))
+        self.__DFFITS__ = DFFITS
+        
+        # Cook's distances
+        cook = eps2/(m*mse)*(leverage/(1-leverage)**2)
+        self.__cook__ = cook
+        
+        # Split statistics to groups
+        self.split_array(self.__leverage__,'__leverage__')
+        self.split_array(self.__weighted_studentized_resids__,'__weighted_studentized_resids__')
+        self.split_array(self.__DFFITS__,'__DFFITS__')
+        self.split_array(self.__cook__,'__cook__')   
+        
+    def calculate_covariance_matrix(self,jac):
+        """Calculate covariance CovB between parameters.
+           https://stats.stackexchange.com/questions/231868/relation-between-covariance-matrix-and-jacobian-in-nonlinear-least-squares"""
+        n = self.length
+        X = jac[:n]
+        MSE = np.sum(fit_result.fun**2)/n
+        CovB = pinv(X.T @ X)*MSE
+        #CovB = inv(X.T @ X)*MSE
+        self.__covb__ = CovB
             
     #def __repr__(self):
     #    return self.__name__
@@ -158,44 +246,6 @@ class AbstractFitPoints:
             return self.__weighted_studentized_resids__
         else:
             raise Exception('unknown statistic %s'%statname)
-        
-    def calculate_fit_statistics(self):
-        """Calculate useful fit statistics (cook, jackknife etc...).
-           For some of the statistics Jacobian matrix is required.
-           
-           Used the following references:
-           https://en.wikipedia.org/wiki/Leverage_(statistics)
-           https://en.wikipedia.org/wiki/Studentized_residual
-           https://en.wikipedia.org/wiki/DFFITS
-           https://www.mathworks.com/help/stats/cooks-distance.html
-           """
-        X = self.__jacobian__   
-        n = X.shape[0] # number of observables
-        m = X.shape[1] # number of free parameters
-        eps = self.__weighted_resids__; eps = eps.flatten() # !!!! IF FLATTEN IS OMITTED, THEN DIMENSIONALITY MISMATCH OCCURS; ANOTHER WAY OF SOLVING THIS IS TO KEEP THE ORIGINAL DIMENSIONALITY (TODO!!!!)
-        eps2 = eps**2
-        sse = np.sum(eps2) # sum of squares error
-        mse = sse/n # mean squared error
-           
-        # Calculate Hat matrix
-        H = X @ pinv(X.T @ X) @ X.T # !!! using generalized inversion (pinv) since rank(X)<n_p
-        
-        # Leverages
-        leverage = np.diag(H)
-        self.__leverage__ = leverage
-        
-        # Studentized residuals (weighted)
-        sigma2 = 1/(n-m)*sse
-        T = eps/(np.sqrt(sigma2)*np.sqrt(1-leverage))
-        self.__weighted_studentized_resids__ = T
-        
-        # DFFITS
-        DFFITS = T*np.sqrt(leverage/(1-leverage))
-        self.__DFFITS__ = DFFITS
-        
-        # Cook's distances
-        cook = eps2/(m*mse)*(leverage/(1-leverage)**2)
-        self.__cook__ = cook        
 
     #@abstractmethod
     def resid_func(self,obs,calc):
