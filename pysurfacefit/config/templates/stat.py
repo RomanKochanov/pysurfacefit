@@ -11,6 +11,12 @@ class Default(ConfigSection):
 # Calculate outlier statistics.
 {outlier_stats_flag}
 
+# Outlier statistics global flag.
+# If set to True, statistics are calculated on the full Jacobian.
+# If set to False, the Jacobian is split into datagroups and all stats are 
+# calculated separately for each datagroup.
+{outlier_stats_global}
+
 # Type of statistics: cook, dffits, leverage ,student.
 {outlier_stats_type}
 
@@ -19,4 +25,5 @@ class Default(ConfigSection):
 """
     stat_file = 'stat.out'
     outlier_stats_flag = True
+    outlier_stats_global = True
     outlier_stats_type = 'cook'

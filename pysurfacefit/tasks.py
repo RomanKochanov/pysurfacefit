@@ -466,6 +466,7 @@ def fit(CONFIG):
     rubber_on = to_bool(CONFIG['FIT']['rubber_on'])
     fitting_method = CONFIG['FIT']['fitting_method']
     analytic_jacobian = to_bool(CONFIG['FIT']['analytic_jacobian'])
+    stat_file = CONFIG['STAT']['stat_file']
     #module_name = CONFIG['MODEL']['model']
     #module_path = os.path.abspath(module_name+'.py') # absolute path
     #module_path = os.path.join('./',module_name+'.py') # relative path
@@ -507,49 +508,164 @@ def fit(CONFIG):
     #serialize_model(f.model_final,modelfile)
     f.model_final.save_params(model.__class__.__name__+'.csv')
     
+    # Get Jacobian, if any.
+    #f.__fitgroups__.__jac__ = f.__result__.__dict__.get('jac')
+    f.__fitgroups__.__jac__ = getattr(f.__result__,'jac',None)
+    
+    #print('f.__fitgroups__.__jac__>>>',f.__fitgroups__.__jac__,type(f.__fitgroups__.__jac__))
+    
     # Save statistics.
-    save_statistics(CONFIG,f)
+    with open(stat_file,'w') as stat_stream:
+        calculate_statistics(
+            CONFIG,f.model_final,f.__fitgroups__,
+            stream=stat_stream,active_only=True)
     
 ##############
 #### STAT ####
 ##############
 
-def save_fitpar_statistics(CONFIG,VARSPACE,output=sys.stdout):
-    pass
+def calculate_fitpar_statistics(CONFIG,fitgroups,stream=sys.stdout,active_only=True):
+    
+    model_name = CONFIG['MODEL']['model']
+    
+#    # Output covariance matrix
+#    print('\n10-ORDERS OF COVARIANCE ("!" MEANS NEGATIVE VALUE)')
+#    cc = j.Collection(); 
+#    for i,row in enumerate(f.__covb__):
+#        #item = {str(j):e for j,e in enumerate(row)}
+#        item = {str(j):(str(int(np.log10(abs(e))))+\
+#            ('' if e>0 else '!')) if j>=i else None for j,e in enumerate(row)} # show only orders of covariance
+#        item['#'] = i
+#        cc.update(item)
+#    order = ['#']+[str(i) for i in range(f.__covb__.shape[0])]
+#    cc.tabulate(order)
 
-def save_group_statistics(CONFIG,VARSPACE,output=sys.stdout):
-    pass
+def calculate_group_statistics(CONFIG,fitgroups,stream=sys.stdout,active_only=True):
+    
+    model_name = CONFIG['MODEL']['model']
 
-def save_lbl_statistics(CONFIG,VARSPACE,output=sys.stdout):
-    pass
+def calculate_residual_statistics(CONFIG,fitgroups,stream=sys.stdout,active_only=True):
+    
+    model_name = CONFIG['MODEL']['model']
+    
+    output = fitgroups.get_output(active_only=active_only)
+    input_matrix = fitgroups.get_inputs(active_only=active_only)
+    full_weights = fitgroups.get_weights(active_only=active_only)
 
-def save_statistics(CONFIG,VARSPACE,output=sys.stdout):
-    save_fitpar_statistics(CONFIG,VARSPACE,output=output)
-    save_group_statistics(CONFIG,VARSPACE,output=output)
-    save_lbl_statistics(CONFIG,VARSPACE,output=output)
+    #model_calc = fitgroups.collect('__calc_vals__',active_only=active_only)
+    #weighted_residuals = fitgroups.collect('__weighted_residuals__',active_only=active_only)
+    #unweighted_residuals = fitgroups.collect('__unweighted_residuals__',active_only=active_only)
+    model_calc = fitgroups.__calc_vals__
+    weighted_residuals = fitgroups.__weighted_resids__
+    unweighted_residuals = fitgroups.__unweighted_resids__
+    
+    length = fitgroups.get_length()
+    input_names = fitgroups.__vars__
+    
+    outlier_stats_flag = to_bool( CONFIG['STAT']['outlier_stats_flag'] )
+    outlier_stats_global = to_bool( CONFIG['STAT']['outlier_stats_global'] )
+    
+    #print('===============calculate_residual_statistics=====================')
+    #print('outlier_stats_flag>>>',outlier_stats_flag,type(outlier_stats_flag))
+    #print('outlier_stats_global>>>',outlier_stats_global,type(outlier_stats_global))
+    
+    outlier_stats = []
+    if outlier_stats_flag and fitgroups.__jac__ is not None: 
+        
+        #print('CALCULATING OUTLIER STATS:')
+        
+        if outlier_stats_global:
+            fitgroups.calculate_outlier_statistics()
+        else:
+            fitgroups.split_global_jacobian(fitgroups.__jac__)
+            for grp in fitgroups.__grps__:            
+                if active_only and not grp.__active__: continue
+                STATS = grp.calculate_outlier_statistics()
+            for stat in STATS:
+                fitgroups.collect(stat,active_only=active_only)
+        
+        outlier_stats.append(['leverage',fitgroups.__leverage__])
+        outlier_stats.append(['student',fitgroups.__student__])
+        outlier_stats.append(['dffits',fitgroups.__DFFITS__])
+        outlier_stats.append(['cook',fitgroups.__cook__])
 
-def stat(CONFIG): # OBSOLETE!!! DELETE THIS FUNCTION
-    """ Calculate fit statustics """
+        
+    # prepare header
+    header = list(input_names) + ['obs','calc','weight','wresid','uresid'] + \
+        [stat_name for stat_name,_ in outlier_stats]
+        
+    col = j.Collection(); col.order = header
+    
+    #print('header>>>',header)
+        
+    # loop through vals to create a full stat collection
+    for i in range(length):
+        
+        input_vals = input_matrix[i]
+        
+        item = {
+            'obs': output[i],
+            'calc': model_calc[i],
+            'weight': full_weights[i],
+            'wresid': weighted_residuals[i],
+            'uresid': unweighted_residuals[i],
+        }
+        
+        for input_name,input_val in zip(input_names,input_vals):
+            item[input_name] = input_val
+        
+        for stat_name,stat_vals in outlier_stats:
+            item[stat_name] = stat_vals[i]
+            
+        col.update(item)
+        
+    #print(col.keys())
+        
+    stat_buffer = col.tabulate(raw=True)
+    
+    # tabulate collection to output, if specified
+    if stream:
+        stream.write('=======================================\n')
+        stream.write('RESIDUAL STATISTICS\n')
+        stream.write('=======================================\n')
+        stream.write(stat_buffer)
+        
+    # save collection to CSV file
+    #with open('%s.resids.csv'%model_name,'w') as f:
+    #    f.write(stat_buffer)
+    col.export_csv('%s.resids.csv'%model_name)
+
+def calculate_statistics(CONFIG,model,fitgroups,stream=sys.stdout,active_only=True):
+    fitgroups.calculate(model,active_only=active_only)
+    #fitgroups.collect_calc_vals(active_only=active_only)
+    #fitgroups.collect_resids(active_only=active_only)
+    calculate_fitpar_statistics(CONFIG,fitgroups,stream=stream,active_only=active_only)
+    calculate_group_statistics(CONFIG,fitgroups,stream=stream,active_only=active_only)
+    calculate_residual_statistics(CONFIG,fitgroups,stream=stream,active_only=active_only)
+
+def stat(CONFIG):
+    """ Calculate fit statistics """
     
     # Get options from the config file.
-    module_name = CONFIG['MODEL']['model']
-    model_name = module_name
-    fitfile = model_name+'.fit'
+    model_name = CONFIG['MODEL']['model']
+    stat_file = CONFIG['STAT']['stat_file']
     output_symbolic_func = to_bool(CONFIG['STAT']['output_symbolic_func'])
     
-    # Check if fit file exists.
-    if not os.path.isfile(fitfile):
-        print('ERROR: cannot find the fit file "%s"'%fitfile)
-        sys.exit()
-        
-    # Import model module (in other case, deserialization is not working).
-    #model = deserialize_model(model_name+'.model')
-    module_path = os.path.join('./',module_name+'.py') # relative path
-    module = import_module_by_path(module_name,module_path)
-        
-    # Get fit object from file.
-    f = deserialize_fit(fitfile)
+    # Get model and read parameters from file.
+    model = load_model(CONFIG)
     
+    # Load fitgroups
+    fitgroups,_ = read_fitgroups(CONFIG)
+    
+    # Load Jacobian
+    jacfile = model.__class__.__name__+'.jac.npy'
+    if os.path.isfile(jacfile):
+        jac = np.load(jacfile)
+    else:
+        jac = None
+        
+    fitgroups.__jac__ = jac
+                       
     # Print symbolic function.
     if output_symbolic_func:
         print('\n\nSYMBOLIC FUNC (ORIGINAL)=====>')
@@ -559,31 +675,10 @@ def stat(CONFIG): # OBSOLETE!!! DELETE THIS FUNCTION
             for psym in f.model_final.__symbolic_params__} # parameters substitution
         expr_sub = f.model_final.__symbolic_func__.subs(dct) # substitute parameters and inputs 
         print(expr_sub)
-            
-    # Print fitting statistics.
-    print('\nFITTING STAT=====>')
-    print('f',f)
-
-    # Print model parameters.
-    print('\nMODEL FINAL=====>')
-    print(f.__model__)
-
-    # Calculate outlier statistics.
-    for grp in f.__fitgroups__:
-        if not grp.__active__: continue
-        grp.calculate_fit_statistics()
-
-    # Output covariance matrix
-    print('\n10-ORDERS OF COVARIANCE ("!" MEANS NEGATIVE VALUE)')
-    cc = j.Collection(); 
-    for i,row in enumerate(f.__covb__):
-        #item = {str(j):e for j,e in enumerate(row)}
-        item = {str(j):(str(int(np.log10(abs(e))))+\
-            ('' if e>0 else '!')) if j>=i else None for j,e in enumerate(row)} # show only orders of covariance
-        item['#'] = i
-        cc.update(item)
-    order = ['#']+[str(i) for i in range(f.__covb__.shape[0])]
-    cc.tabulate(order)
+    
+    # Save statistics.
+    with open(stat_file,'w') as stat_stream:
+        calculate_statistics(CONFIG,model,fitgroups,stream=stat_stream,active_only=True)
 
 #################
 #### CODEGEN ####
@@ -899,6 +994,12 @@ def plot_sections(CONFIG):
     print('')
 
     leg = []
+    
+    # Calculate outlier statistics if needed.
+    if plot_outlier_stats:
+        print('Calculating outlier statistics...')
+        fitgroups.calculate(model,active_only=True)
+        print('...done')
 
     for fitgroup,grp_color in zip(fitgroups,cycle(COLORS)):
         

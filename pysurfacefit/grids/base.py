@@ -44,7 +44,37 @@ def calc_on_grid_numba_scalar(meshes,func,parameters,length):
         res[i] = out
     return res
 
-class Grid:
+class AbstractGrid:
+    """
+    Abstract grid parent class.
+    """
+    
+    @property
+    def __size__(self):
+        return self.__meshes__[0].size
+        
+    @property
+    def __shape__(self):
+        return self.__meshes__[0].shape
+        
+    @property
+    def __dim__(self):
+        return len(self.__vars__)    
+
+    def __getitem__(self,varname):
+        return self.__meshes__[self.__hash__[varname]]
+
+    def flatten(self):
+        return flatten(*self.__meshes__)
+        
+    def get_meshes(self,**kwargs):
+        raise NotImplementedError
+
+    def calculate(self,func,parameters=[],dimension=1,numba=False,
+            flat=False,squeeze=True,dtype=np.float64):
+        raise NotImplementedError
+
+class Grid(AbstractGrid):
     """
     desc: {'v1':grid1, 'v2':grid2 ...}
     vars: ['v1','v2',...]
@@ -57,15 +87,15 @@ class Grid:
         grids = [self.__desc__[name] for name in vars]        
         meshes = np.meshgrid(*grids)
         self.__meshes__ = meshes
-        self.__size__ = meshes[0].size
-        self.__shape__ = meshes[0].shape
+        #self.__size__ = meshes[0].size
+        #self.__shape__ = meshes[0].shape
         self.__hash__ = {name:i for i,name in enumerate(vars)} # hash for lookup mesh by the variable name
-    
-    def __getitem__(self,varname):
-        return self.__meshes__[self.__hash__[varname]]
         
-    def flatten(self):
-        return flatten(*self.__meshes__)
+    #def __getitem__(self,varname):
+    #    return self.__meshes__[self.__hash__[varname]]
+        
+    #def flatten(self):
+    #    return flatten(*self.__meshes__)
         
     def get_meshes(self,ind=None,flat=False,squeeze=True):
         # https://docs.scipy.org/doc/numpy-1.15.1/reference/generated/numpy.squeeze.html
@@ -110,7 +140,7 @@ class Grid:
                 
         return res
         
-class List:
+class List(AbstractGrid):
     """
     desc: {'v1':grid1, 'v2':grid2 ...}
     vars: ['v1','v2',...]
@@ -122,15 +152,15 @@ class List:
         self.__vars__ = vars
         meshes = [self.__desc__[name] for name in vars]
         self.__meshes__ = meshes
-        self.__size__ = meshes[0].size
-        self.__shape__ = meshes[0].shape
+        #self.__size__ = meshes[0].size
+        #self.__shape__ = meshes[0].shape
         self.__hash__ = {name:i for i,name in enumerate(vars)} # hash for lookup mesh by the variable name
         
-    def __getitem__(self,varname):
-        return self.__meshes__[self.__hash__[varname]]        
+    #def __getitem__(self,varname):
+    #    return self.__meshes__[self.__hash__[varname]]        
         
-    def flatten(self): # newly added
-        return flatten(*self.__meshes__)
+    #def flatten(self): # newly added
+    #    return flatten(*self.__meshes__)
                         
     def get_meshes(self,ind=None,flat=False):
         meshes = self.__meshes__
