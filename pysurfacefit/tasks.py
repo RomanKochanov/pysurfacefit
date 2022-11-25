@@ -516,7 +516,7 @@ def fit(CONFIG):
     
     # Save statistics.
     with open(stat_file,'w') as stat_stream:
-        calculate_statistics(
+        calculate_and_save_statistics(
             CONFIG,f.model_final,f.__fitgroups__,
             stream=stat_stream,active_only=True)
     
@@ -524,7 +524,7 @@ def fit(CONFIG):
 #### STAT ####
 ##############
 
-def calculate_fitpar_statistics(CONFIG,fitgroups,stream=sys.stdout,active_only=True):
+def calculate_fitpar_statistics(CONFIG,fitgroups,save=True,stream=sys.stdout,active_only=True):
     
     model_name = CONFIG['MODEL']['model']
     
@@ -540,11 +540,11 @@ def calculate_fitpar_statistics(CONFIG,fitgroups,stream=sys.stdout,active_only=T
 #    order = ['#']+[str(i) for i in range(f.__covb__.shape[0])]
 #    cc.tabulate(order)
 
-def calculate_group_statistics(CONFIG,fitgroups,stream=sys.stdout,active_only=True):
+def calculate_group_statistics(CONFIG,fitgroups,save=True,stream=sys.stdout,active_only=True):
     
     model_name = CONFIG['MODEL']['model']
 
-def calculate_residual_statistics(CONFIG,fitgroups,stream=sys.stdout,active_only=True):
+def calculate_residual_statistics(CONFIG,fitgroups,save=True,stream=sys.stdout,active_only=True):
     
     model_name = CONFIG['MODEL']['model']
     
@@ -575,7 +575,9 @@ def calculate_residual_statistics(CONFIG,fitgroups,stream=sys.stdout,active_only
         #print('CALCULATING OUTLIER STATS:')
         
         if outlier_stats_global:
-            fitgroups.calculate_outlier_statistics()
+            STATS = fitgroups.calculate_outlier_statistics()
+            for stat in STATS:
+                fitgroups.split(STATS[stat],stat,active_only=True)
         else:
             fitgroups.split_global_jacobian(fitgroups.__jac__)
             for grp in fitgroups.__grps__:            
@@ -633,15 +635,16 @@ def calculate_residual_statistics(CONFIG,fitgroups,stream=sys.stdout,active_only
     # save collection to CSV file
     #with open('%s.resids.csv'%model_name,'w') as f:
     #    f.write(stat_buffer)
-    col.export_csv('%s.resids.csv'%model_name)
+    if save:
+        col.export_csv('%s.resids.csv'%model_name)
 
-def calculate_statistics(CONFIG,model,fitgroups,stream=sys.stdout,active_only=True):
+def calculate_and_save_statistics(CONFIG,model,fitgroups,stream=sys.stdout,active_only=True):
     fitgroups.calculate(model,active_only=active_only)
     #fitgroups.collect_calc_vals(active_only=active_only)
     #fitgroups.collect_resids(active_only=active_only)
-    calculate_fitpar_statistics(CONFIG,fitgroups,stream=stream,active_only=active_only)
-    calculate_group_statistics(CONFIG,fitgroups,stream=stream,active_only=active_only)
-    calculate_residual_statistics(CONFIG,fitgroups,stream=stream,active_only=active_only)
+    calculate_fitpar_statistics(CONFIG,fitgroups,save=True,stream=stream,active_only=active_only)
+    calculate_group_statistics(CONFIG,fitgroups,save=True,stream=stream,active_only=active_only)
+    calculate_residual_statistics(CONFIG,fitgroups,save=True,stream=stream,active_only=active_only)
 
 def stat(CONFIG):
     """ Calculate fit statistics """
@@ -678,7 +681,7 @@ def stat(CONFIG):
     
     # Save statistics.
     with open(stat_file,'w') as stat_stream:
-        calculate_statistics(CONFIG,model,fitgroups,stream=stat_stream,active_only=True)
+        calculate_and_save_statistics(CONFIG,model,fitgroups,stream=stat_stream,active_only=True)
 
 #################
 #### CODEGEN ####
@@ -997,9 +1000,15 @@ def plot_sections(CONFIG):
     
     # Calculate outlier statistics if needed.
     if plot_outlier_stats:
+        jacfile = model.__class__.__name__+'.jac.npy'
+        print('Loading Jacobian matrix from %s.'%jacfile)
+        fitgroups.__jac__ = np.load(jacfile)
         print('Calculating outlier statistics...')
         fitgroups.calculate(model,active_only=True)
-        print('...done')
+        with open(os.devnull,'w') as devnull:
+            calculate_residual_statistics(CONFIG,fitgroups,save=False,
+                stream=devnull,active_only=True)
+        print('...DONE')
 
     for fitgroup,grp_color in zip(fitgroups,cycle(COLORS)):
         
