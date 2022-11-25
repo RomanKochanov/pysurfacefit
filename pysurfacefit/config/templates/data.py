@@ -24,6 +24,10 @@ class Default(ConfigSection):
 # test3   test3.csv  1         0       1
 {dataspec}
 
+# CSV file containing data points to exclude.
+# File must contain input and output columns defined below.
+{exclude}
+
 # Names and units of the input data columns. 
 # Input names must be separated by semicolon 
 # and should not contain dots.

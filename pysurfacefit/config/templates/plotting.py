@@ -16,6 +16,8 @@ class Default(ConfigSection):
 #           plot sections/cuts of the fitted model vs datapoints.
 #   => "history":
 #           plot fitting history for each data group.
+#   => "pareto":
+#           plot Pareto frontier for the Leverage/Cook outlier pairs.
 {plot_mode}
 
 # MIN_WHT_RES; MAX_WHT_RES; MIN_UNWHT_RES; MAX_UNWHT_RES; WHT_SSE; UNWHT_SSE; WHT_SD; UNWHT_SD

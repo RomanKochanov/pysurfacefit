@@ -230,7 +230,11 @@ def read_fitgroups(CONFIG,verbose=False):
     # Get the config options.
     datafile = CONFIG['DATA']['datafile'].strip()
     dataspec = CONFIG['DATA']['dataspec'].strip()
-
+    
+    exclude_file = CONFIG['DATA']['exclude']
+    if exclude_file is not None:
+        exclude_file = exclude_file.strip()
+    
     # => input and output names
     INPUTS = parse_input_columns(CONFIG)
     OUTPUT = CONFIG['DATA']['output_column']
@@ -243,6 +247,12 @@ def read_fitgroups(CONFIG,verbose=False):
     
     # => weight functin for data
     wht_fun = eval( CONFIG['DATA']['wht_fun'] )
+    
+    # Import exclusion collection and make a lookup hash
+    if exclude_file:
+        col_exclude = j.import_csv(exclude_file)
+        get_exclude_keys = lambda v: tuple([v[k] for k in INPUTS+[OUTPUT]])
+        exclude_hash = col_exclude.group(get_exclude_keys)
     
     if not datafile and not dataspec:
         print('ERROR: either datafile of dataspec should be non-empty.')
@@ -269,14 +279,17 @@ def read_fitgroups(CONFIG,verbose=False):
         fitgroup_name = item['alias'].strip()
         fitgroup_type = item['type']
         fitgroup_wht_mul = item['wht_mul']
-        if verbose: print('\n===============================')
-        if verbose: print(fitgroup_name)
-        if verbose: print('===============================')
+        print('\n===============================')
+        print(fitgroup_name)
+        print('===============================')
         # Get points from the CSV file
         col = j.import_csv(fitgroup_path)
         order = col.order
         # Apply data cutoff
-        col = col.subset(col.ids(lambda v: GLOBAL_CUTOFF_MIN<=v[OUTPUT]<=GLOBAL_CUTOFF_MAX))
+        col = col.subset(col.ids(lambda v: GLOBAL_CUTOFF_MIN<=v[OUTPUT]<=GLOBAL_CUTOFF_MAX)); n = len(col.ids())
+        # Apply data exclusion
+        if exclude_file: col = col.subset(col.ids(lambda v: get_exclude_keys(v) not in exclude_hash))
+        print('Excluded %d data points'%(n-len(col.ids())))
         # Get the data columns 
         input_columns = col.getcols(INPUTS)
         output_column = col.getcol(OUTPUT)
@@ -544,9 +557,41 @@ def calculate_group_statistics(CONFIG,fitgroups,save=True,stream=sys.stdout,acti
     
     model_name = CONFIG['MODEL']['model']
 
+#https://mlink.in/qa/?qa=769607/
+#https://code.activestate.com/recipes/578287-multidimensional-pareto-front/
+def is_pareto_efficient(costs,maximize=True,return_mask=True):
+    """
+    Find the pareto-efficient points
+    :param costs: An (n_points, n_costs) array
+    :param return_mask: True to return a mask
+    :return: An array of indices of pareto-efficient points.
+        If return_mask is True, this will be an (n_points, ) boolean array
+        Otherwise it will be a (n_efficient_points, ) integer array of indices.
+    """
+    is_efficient = np.arange(costs.shape[0])
+    n_points = costs.shape[0]
+    next_point_index = 0  # Next index in the is_efficient array to search for
+    while next_point_index<len(costs):
+        if maximize:
+            nondominated_point_mask = np.any(costs>costs[next_point_index], axis=1)
+        else:
+            nondominated_point_mask = np.any(costs<costs[next_point_index], axis=1)
+        nondominated_point_mask[next_point_index] = True
+        is_efficient = is_efficient[nondominated_point_mask]  # Remove dominated points
+        costs = costs[nondominated_point_mask]
+        next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1
+    if return_mask:
+        is_efficient_mask = np.zeros(n_points, dtype = bool)
+        is_efficient_mask[is_efficient] = True
+        return is_efficient_mask
+    else:
+        return is_efficient
+        
 def calculate_residual_statistics(CONFIG,fitgroups,save=True,stream=sys.stdout,active_only=True):
     
     model_name = CONFIG['MODEL']['model']
+
+    output_column = CONFIG['DATA']['output_column']
     
     output = fitgroups.get_output(active_only=active_only)
     input_matrix = fitgroups.get_inputs(active_only=active_only)
@@ -593,7 +638,7 @@ def calculate_residual_statistics(CONFIG,fitgroups,save=True,stream=sys.stdout,a
 
         
     # prepare header
-    header = list(input_names) + ['obs','calc','weight','wresid','uresid'] + \
+    header = list(input_names) + [output_column] + ['obs','calc','weight','wresid','uresid'] + \
         [stat_name for stat_name,_ in outlier_stats]
         
     col = j.Collection(); col.order = header
@@ -612,6 +657,8 @@ def calculate_residual_statistics(CONFIG,fitgroups,save=True,stream=sys.stdout,a
             'wresid': weighted_residuals[i],
             'uresid': unweighted_residuals[i],
         }
+        
+        item[output_column] = output[i]
         
         for input_name,input_val in zip(input_names,input_vals):
             item[input_name] = input_val
@@ -632,11 +679,36 @@ def calculate_residual_statistics(CONFIG,fitgroups,save=True,stream=sys.stdout,a
         stream.write('=======================================\n')
         stream.write(stat_buffer)
         
-    # save collection to CSV file
-    #with open('%s.resids.csv'%model_name,'w') as f:
-    #    f.write(stat_buffer)
     if save:
+        # save outlier statistics to file
         col.export_csv('%s.resids.csv'%model_name)
+        
+        # save Pareto front based on outlier statistics (if provided)
+        if outlier_stats:
+        
+            print('Calculating Pareto set for the Leverage/Cook pairs...')
+        
+            def func_factory():
+                count = -1
+                def get_id(v):
+                    nonlocal count
+                    count += 1
+                    return count
+                return get_id
+        
+            leverage,cook,ids = col.getcols(['leverage','cook','id'],
+                functions={'id':func_factory()})
+        
+            costs = np.array((leverage,cook))
+            costs = costs.T
+            mask = is_pareto_efficient(costs,return_mask=False)
+            ids_pareto = list(np.array(ids)[mask])
+            col_pareto = col.subset(ids_pareto)
+            col_pareto.order = col.order
+            pareto_file = '%s.pareto.csv'%model_name
+            col_pareto.export_csv(pareto_file)
+            
+            print('...saved to %s'%pareto_file)
 
 def calculate_and_save_statistics(CONFIG,model,fitgroups,stream=sys.stdout,active_only=True):
     fitgroups.calculate(model,active_only=active_only)
@@ -1141,6 +1213,24 @@ def plot_fit_history(CONFIG):
     if fit_history_logscale: pl.yscale('log')
     pl.show()
 
+def plot_pareto(CONFIG):
+    """ Plot Pareto set for the most influential outliers. """
+    
+    # Get options from the config file.
+    model_name = CONFIG['MODEL']['model']
+
+    # Open cached file with residuals Pareto set and plot.
+    col = j.import_csv('%s.resids.csv'%model_name)
+    col_pareto = j.import_csv('%s.pareto.csv'%model_name)
+    
+    pl.plot(*col.getcols(['leverage','cook']),'bo')
+    pl.plot(*col_pareto.getcols(['leverage','cook']),'ro')
+    pl.xscale('log')
+    pl.yscale('log')
+    pl.xlabel('leverage')
+    pl.ylabel('cook')
+    pl.show()
+
 def plot(CONFIG):
     """ interface for the plotting section. Supports a number of standard plots. """
     
@@ -1154,6 +1244,8 @@ def plot(CONFIG):
         plot_sections(CONFIG)
     elif plot_mode=='history':
         plot_fit_history(CONFIG)
+    elif plot_mode=='pareto':
+        plot_pareto(CONFIG)
     else:
         print('ERROR: unknown plotting mode "%s"'%plot_mode)
         sys.exit()
