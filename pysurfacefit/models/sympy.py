@@ -568,8 +568,9 @@ class ModelSympy(Model):
         result_var = 'calc__result__'
         
         # Create the Sympy expression
-        dct = {psym.get_value():self.__params__[psym.__name__].get_value() for psym in self.__symbolic_params__} # parameters substitution
-        expr_sub = self.__symbolic_func__.subs(dct) # substitute parameters and inputs        
+        dct_par = {psym.get_value():self.__params__[psym.__name__].get_value() for psym in self.__symbolic_params__} # parameters substitution
+        dct_inp = {input:sy.Symbol(argname) for input,argname in zip(self.__symbolic_inputs__,self.__input_names__)} # inputs substitution
+        expr_sub = self.__symbolic_func__.subs(dct_par).subs(dct_inp) # substitute parameters and inputs        
         expr_sub_f90 = sy.fcode(expr_sub.evalf(),assign_to=result_var,standard=90,source_format='free')  # get rid of functions of constants;  
 
         # Create the raw Fortran code
