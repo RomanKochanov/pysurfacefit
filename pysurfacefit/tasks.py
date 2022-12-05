@@ -460,15 +460,21 @@ def import_module_by_path(module_name,module_path):
     spec.loader.exec_module(module)
     return module
 
-def load_model(CONFIG):
-    """ Load model from its module.
+def load_model_(module_name):
+    """ Load model from its module (no config).
         Model should read its parameters automatically! """
-    module_name = CONFIG['MODEL']['model']
     #module_path = os.path.abspath(module_name+'.py') # absolute path
     module_path = os.path.join('./',module_name+'.py') # relative path
     module = import_module_by_path(module_name,module_path)
     model_object = 'model'
     model = getattr(module,model_object)
+    return model
+
+def load_model(CONFIG):
+    """ Load model from its module.
+        Model should read its parameters automatically! """
+    module_name = CONFIG['MODEL']['model']
+    model = load_model_(module_name)
     return model
 
 def fit(CONFIG):
@@ -893,6 +899,9 @@ def plot_residuals(CONFIG):
     INPUTS = parse_input_columns(CONFIG)
     OUTPUT = CONFIG['DATA']['output_column']
     dim = len(INPUTS)
+    
+    # Get addiitonal model list to compare with
+    compare_with_models = CONFIG['PLOTTING']['compare_with_models'].strip()
 
     # X axis for residuals.
     resids_x_axes = CONFIG['PLOTTING']['resids_x_axes']   
@@ -906,7 +915,7 @@ def plot_residuals(CONFIG):
     # Get data collection.
     _,col_data = read_fitgroups(CONFIG)
         
-    # Do the plotting part.
+    # Prepare observable data.
     ids_sort = col_data.sort(resids_x_axes)
     DATA = col_data.getcols(
         #INPUTS+[OUTPUT,resids_x_axes,'N'],
@@ -917,28 +926,60 @@ def plot_residuals(CONFIG):
     #resid_axis_data,nn = DATA[dim+1:]
     resid_axis_data = DATA[dim+1]
     grid = List(*reduce(lambda x,y:x+y,zip(INPUTS,input_columns))) # list-based grid
-    model_vals = model.calculate(grid)
-       
+    
+    # Do the plotting part.
+    #model_vals = model.calculate(grid)
+    
+    models = [model]
+    if compare_with_models:
+        model_names = parse_semicolon_list(CONFIG,'PLOTTING','compare_with_models')
+        for model_name in model_names:
+            models.append(load_model_(model_name))
+    
+    # =============
+    # UPPER SUBPLOT
+    # =============
+    
     ax1 = plt.subplot2grid((4,1),(0,0),rowspan=3)
-    #plt.title(modfile)
-    plt.title('residuals')
     ax1.get_xaxis().get_major_formatter().set_useOffset(False) # set normal format
-    leg = []
-    plt.plot(resid_axis_data,output_column,'ro'); leg.append('data')
-    plt.plot(resid_axis_data,model_vals,'b.'); leg.append('model')
 
-    #if SHOW_N:
-    #    for n,v,raxis in zip(nn,output_column,resid_axis_data):
-    #        ax1.text(raxis,v,'%d'%n)
+    leg = ['DATA']
+    
+    # plot observable data
+    #plt.plot(resid_axis_data,output_column,'ro'); leg.append('data')
+    plt.scatter(resid_axis_data, output_column, fc='none', ec='r', s=100)
 
+    model_calc_vals = []
+    for model,color,marker in zip(models,cycle(COLORS),cycle(MARKERS)):
+
+        model_vals = model.calculate(grid)
+        plt.plot(resid_axis_data,model_vals,marker,color=color)
+        leg.append(model.__class__.__name__)
+        model_calc_vals.append(model_vals)
+
+        #if SHOW_N:
+        #    for n,v,raxis in zip(nn,output_column,resid_axis_data):
+        #        ax1.text(raxis,v,'%d'%n)
+
+    plt.title('residuals')
     plt.legend(leg)
     plt.grid(True)
     plt.ylabel(OUTPUT)
     
+    # =============
+    # LOWER SUBPLOT
+    # =============
+
     plt.subplot2grid((4,1),(3,0),rowspan=1,sharex=ax1)
-    plt.plot(resid_axis_data,output_column-model_vals,'-')
+
+    #leg = []
+    for model_vals,model,color,marker in zip(model_calc_vals,models,cycle(COLORS),cycle(MARKERS)):
+        plt.plot(resid_axis_data,output_column-model_vals,marker+'-',color=color)
+        #leg.append(model.__class__.__name__)
+    
     plt.xlabel(resids_x_axes)
-    plt.legend(['data-model'])
+    plt.ylabel('OBS-CALC')
+    #plt.legend(leg)
     plt.grid(True)
     
     plt.show()    
@@ -1037,6 +1078,9 @@ def plot_sections(CONFIG):
     INPUTS = parse_input_columns(CONFIG)
     OUTPUT = CONFIG['DATA']['output_column']
     
+    # Get addiitonal model list to compare with
+    compare_with_models = CONFIG['PLOTTING']['compare_with_models'].strip()
+    
     # Import model module (in other case, deserialization is not working).
     #module_path = os.path.join('./',module_name+'.py') # relative path
     #module = import_module_by_path(module_name,module_path)
@@ -1126,23 +1170,35 @@ def plot_sections(CONFIG):
     #y_calc = meshes[indexes_unfixed[1]]
     calc_data = [meshes[i] for i in indexes_unfixed]
     
-    if calculate_components:
-        results = model.calculate_components(g,compnames=components)
-    else:
-        results = model.calculate(g); results = [results]
-            
-    for res,compname,color in zip(results,['MODEL']+components,cycle(COLORS)):
-        print('plotting %s (%s)'%(compname,color))
-        if n_unfixed==2:
-            surf = plotter.plot_surface(*calc_data,res,alpha=surface_opacity,color=color)
-            # solution for Matplotlib >=3.3
-            # https://stackoverflow.com/questions/4536103/how-can-i-upgrade-specific-packages-using-pip-and-a-requirements-file
-            surf._facecolors2d = surf._facecolor3d
-            surf._edgecolors2d = surf._edgecolor3d
-        elif n_unfixed==1:
-            plotter.plot(*calc_data,res,color=color)
+    models = [model]
+    if compare_with_models:
+        model_names = parse_semicolon_list(CONFIG,'PLOTTING','compare_with_models')
+        for model_name in model_names:
+            models.append(load_model_(model_name))
+    
+    for model,color in zip(models,cycle(COLORS)):
+        
+        model_name = model.__class__.__name__
+    
+        if calculate_components:
+            results = model.calculate_components(g,compnames=components)
         else:
-            raise NotImplementedError
+            results = model.calculate(g); results = [results]
+            
+        for res,compname in zip(results,['%s (FULL MODEL)'%model_name]+\
+                ['%s (%s)'%(model_name,c) for c in components]):
+            print('\nplotting %s (%s) for %s'%(compname,color,model_name))
+            leg.append(compname)
+            if n_unfixed==2:
+                surf = plotter.plot_surface(*calc_data,res,alpha=surface_opacity,color=color)
+                # solution for Matplotlib >=3.3
+                # https://stackoverflow.com/questions/4536103/how-can-i-upgrade-specific-packages-using-pip-and-a-requirements-file
+                surf._facecolors2d = surf._facecolor3d
+                surf._edgecolors2d = surf._edgecolor3d
+            elif n_unfixed==1:
+                plotter.plot(*calc_data,res,color=color)
+            else:
+                raise NotImplementedError
 
     plt.title(make_title(gridspec,indexes_unfixed,bindings))
     
@@ -1159,7 +1215,7 @@ def plot_sections(CONFIG):
     if plot_outlier_stats: 
         plt.colorbar(sc)
 
-    leg += ['calc_model']
+    #leg += ['calc_model']
     plotter.legend(leg)
 
     plt.grid(True)

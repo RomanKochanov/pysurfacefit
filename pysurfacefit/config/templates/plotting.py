@@ -34,6 +34,9 @@ class Default(ConfigSection):
 #          __func__ method.
 {gridspec}
 
+# Compare current model to other models.
+{compare_with_models} 
+
 # Model components to plot.
 {model_components}
 
@@ -61,6 +64,7 @@ class Default(ConfigSection):
     plot_mode = 'residuals'
     fit_history_stat = 'WHT_SSE'
     fit_history_logscale = True
+    compare_with_models = ''
     scatter_opacity = 1
     resize_by_weights = False
     surface_opacity = 0.4
