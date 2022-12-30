@@ -251,7 +251,8 @@ def read_fitgroups(CONFIG,verbose=False):
     # Import exclusion collection and make a lookup hash
     if exclude_file:
         col_exclude = j.import_csv(exclude_file)
-        get_exclude_keys = lambda v: tuple([v[k] for k in INPUTS+[OUTPUT]])
+        #get_exclude_keys = lambda v: tuple([v[k] for k in INPUTS+[OUTPUT]])
+        get_exclude_keys = lambda v: tuple([v[k] for k in INPUTS])
         exclude_hash = col_exclude.group(get_exclude_keys)
     
     if not datafile and not dataspec:
