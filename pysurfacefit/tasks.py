@@ -1044,11 +1044,6 @@ def get_model_components(CONFIG):
 def plot_sections(CONFIG):
     """ Plot model cuts and compare to the data points (if any). """
     
-    # Get options from the config file.
-    #module_name = CONFIG['MODEL']['model']
-    #model_name = module_name
-    #fitfile = model_name+'.fit'
-
     # Get argument names.
     argnames = get_arguments(CONFIG)
     n_args = len(argnames)
@@ -1082,21 +1077,11 @@ def plot_sections(CONFIG):
     # Get addiitonal model list to compare with
     compare_with_models = CONFIG['PLOTTING']['compare_with_models'].strip()
     
-    # Import model module (in other case, deserialization is not working).
-    #module_path = os.path.join('./',module_name+'.py') # relative path
-    #module = import_module_by_path(module_name,module_path)
-    
-    # Get fitter object from file.
-    #f = deserialize_fit(fitfile)
-    
+    # Import model module (in other case, deserialization is not working).   
     model = load_model(CONFIG)
     
     # Get fitgroups and calculate statistics.
     fitgroups,_ = read_fitgroups(CONFIG)
-    # HOW TO CALCULATE FIT STATISTICS???
-    #fitgroups = f.__fitgroups__
-    #for grp in fitgroups:
-    #    grp.calculate_fit_statistics()
     
     # Get model components list.
     components = get_model_components(CONFIG)
@@ -1104,7 +1089,6 @@ def plot_sections(CONFIG):
     # Do plotting stuff.
     if n_unfixed==2:
         fig = plt.figure()
-        #plotter = Axes3D(fig)
         plotter = fig.add_subplot(111, projection='3d')
     elif n_unfixed==1:
         plotter = plt
@@ -1127,6 +1111,7 @@ def plot_sections(CONFIG):
                 stream=devnull,active_only=True)
         print('...DONE')
 
+    # Plot data points.
     for fitgroup,grp_color in zip(fitgroups,cycle(COLORS)):
         
         # find index of all data points whose fixed columns correspond to gridspec
@@ -1145,8 +1130,6 @@ def plot_sections(CONFIG):
         leg.append('%s (%d/%d)'%(fitgroup.__name__,n_sel,n_tot))
         
         meshes = fitgroup.__inputgrid__.get_meshes(ind)
-        #x_data = meshes[indexes_unfixed[0]]
-        #y_data = meshes[indexes_unfixed[1]]
         plot_data = [meshes[i] for i in indexes_unfixed]
         output_data = fitgroup.__output__[ind]
         if plot_outlier_stats:
@@ -1155,20 +1138,39 @@ def plot_sections(CONFIG):
             stat_colors = stat
         else:
             stat_title = ''
-            #stat_colors = 'black'
             stat_colors = grp_color
         
         if n_unfixed in [1,2]:
-            #sc = plotter.scatter(x_data,y_data,output_data,c=stat_colors,
             sc = plotter.scatter(*plot_data,output_data,c=stat_colors,
                         s=marker_size,alpha=scatter_opacity)
         else:
             raise NotImplementedError
-
+            
+    # Plot excluded data points.
+    exclude = CONFIG['DATA']['exclude']
+    if exclude:
+        col_exclude = j.import_csv(exclude)
+        def condition(v):
+            cond = True
+            for index_fixed in indexes_fixed:
+                argname_fixed,colname_fixed = bindings[index_fixed]
+                val_fixed = gridspec_dict[argname_fixed][0]
+                cond_ = v[colname_fixed]==val_fixed
+                cond = cond and cond_
+            return cond
+        col_exclude = col_exclude.subset(col_exclude.ids(condition))
+        plot_data = col_exclude.getcols(
+            [bindings[index_unfixed][1] \
+                for index_unfixed in indexes_unfixed]+[OUTPUT]
+        )
+        if plot_data[0]:
+            plotter.scatter(*plot_data,c='red',
+                s=marker_size+40,alpha=scatter_opacity)
+            leg.append('data excluded')
+    
+    # Plot models.
     g = Grid(*reduce(lambda x,y:x+y,gridspec))
     meshes = g.get_meshes()
-    #x_calc = meshes[indexes_unfixed[0]]
-    #y_calc = meshes[indexes_unfixed[1]]
     calc_data = [meshes[i] for i in indexes_unfixed]
     
     models = [model]
