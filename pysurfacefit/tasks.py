@@ -30,7 +30,18 @@ from mpl_toolkits.mplot3d import Axes3D
 to_type = lambda val,typ: typ(val) if val not in (None,'') else None
 to_int = lambda val: to_type(val,int)
 to_float = lambda val: to_type(val,float)
-to_bool = lambda val: val.lower() in ("yes", "true", "t", "1")
+#to_bool = lambda val: val if val.lower() in ("yes", "true", "t", "1")
+def to_bool(val):
+    if type(val) is bool:
+        return val
+    elif val is None:
+        return False
+    elif type(val) in {int,float}:
+        return bool(val)
+    elif type(val) is str:
+        return val.lower() in ("yes", "true", "t", "1")
+    else:
+        raise Exception('unknown type')
 
 ######################
 #### STARTPROJECT ####
