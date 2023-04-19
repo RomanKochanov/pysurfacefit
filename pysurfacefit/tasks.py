@@ -498,52 +498,25 @@ def fit(CONFIG):
     fitting_method = CONFIG['FIT']['fitting_method']
     analytic_jacobian = to_bool(CONFIG['FIT']['analytic_jacobian'])
     stat_file = CONFIG['STAT']['stat_file']
-    #module_name = CONFIG['MODEL']['model']
-    #module_path = os.path.abspath(module_name+'.py') # absolute path
-    #module_path = os.path.join('./',module_name+'.py') # relative path
     fitopts = parse_fit_options(CONFIG)
-    #model_name = 'Model'
-    #model_name = module_name
-    #model_object = 'model'
-    #model = getattr(__import__(module_name),model_name)
-    #module = import_module_by_path(module_name,module_path)
-    #model = getattr(module,model_object)
+    model_name = CONFIG['MODEL']['model']
     model = load_model(CONFIG)
     fitgroups,_ = read_fitgroups(CONFIG)
-    #fitfile = module_name+'.fit'
-    #modelfile = module_name+'.model'
     
     # Create Fitter object from scratch.
     f = Fitter(model=model,fitgroups=fitgroups,
             weighted=weighted_fit,rubber_on=rubber_on,
             method=fitting_method,jac=analytic_jacobian,
             **fitopts);
-    
-    # If fit file is absent, create a fit from scratch.
-    #if not os.path.exists(fitfile):
-    #    f = Fitter(model=model,fitgroups=fitgroups,
-    #        weighted=weighted_fit,rubber_on=rubber_on,
-    #        method=fitting_method,jac=analytic_jacobian,
-    #        **fitopts);
-    #else:
-    #    f = deserialize_fit(fitfile)
-    #    f.__fitgroups__ = fitgroups    
-        
+            
     # Start fit.
     f.fit()
     
-    # Save fit.
-    #serialize_fit(f,fitfile)
-
     # Save model.
-    #serialize_model(f.model_final,modelfile)
-    f.model_final.save_params(model.__class__.__name__+'.csv')
+    f.model_final.save_params(model_name+'.csv')
     
     # Get Jacobian, if any.
-    #f.__fitgroups__.__jac__ = f.__result__.__dict__.get('jac')
     f.__fitgroups__.__jac__ = getattr(f.__result__,'jac',None)
-    
-    #print('f.__fitgroups__.__jac__>>>',f.__fitgroups__.__jac__,type(f.__fitgroups__.__jac__))
     
     # Save statistics.
     with open(stat_file,'w') as stat_stream:
@@ -1063,6 +1036,9 @@ def plot_sections(CONFIG):
     bindings = get_argument_bindings(CONFIG)
     bindings_dict = dict(bindings)
     
+    # Get main model name
+    main_model_name = CONFIG['MODEL']['model']
+    
     # Get gridpes and indexes of unfixed arguments
     gridspec,indexes_unfixed = \
         parse_gridspec(CONFIG,CONFIG['PLOTTING']['gridspec'])
@@ -1185,15 +1161,15 @@ def plot_sections(CONFIG):
     calc_data = [meshes[i] for i in indexes_unfixed]
     
     models = [model]
+    model_names = [main_model_name]
     if compare_with_models:
-        model_names = parse_semicolon_list(CONFIG,'PLOTTING','compare_with_models')
-        for model_name in model_names:
+        aux_model_names = parse_semicolon_list(CONFIG,'PLOTTING','compare_with_models')
+        model_names += aux_model_names
+        for model_name in aux_model_names:
             models.append(load_model_(model_name))
-    
-    for model,color in zip(models,cycle(COLORS)):
         
-        model_name = model.__class__.__name__
-    
+    for model,color,model_name in zip(models,cycle(COLORS),model_names):
+            
         if calculate_components:
             results = model.calculate_components(g,compnames=components)
         else:
