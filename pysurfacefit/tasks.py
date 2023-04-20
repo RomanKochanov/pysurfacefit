@@ -314,6 +314,9 @@ def read_fitgroups(CONFIG,verbose=False):
         # Prepare fitting grid (list)
         grid = List(*reduce(lambda x,y:x+y,zip(INPUTS,input_columns))) # list-based grid
         # Prepare fitgroup for points
+        if type(fitgroup_type) is str:
+            fitgroup_type = fitgroup_type.strip()
+            if fitgroup_type: fitgroup_type = int(fitgroup_type)
         if fitgroup_type in ['', None, 0]:
             FitPointsType = FitPoints
         elif fitgroup_type==-1:
