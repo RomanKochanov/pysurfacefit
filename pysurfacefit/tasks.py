@@ -1140,7 +1140,7 @@ def plot_sections(CONFIG):
     outlier_stats_type = CONFIG['STAT']['outlier_stats_type']
     plot_outlier_stats = to_bool( CONFIG['PLOTTING']['plot_outlier_stats'] )
     exclude = CONFIG['DATA']['exclude']
-    annotate_field = CONFIG['PLOTTING']['annotate_field'].strip()
+    annotate_field = CONFIG['PLOTTING']['annotate_field']
 
     # Get input and output names
     INPUTS = parse_input_columns(CONFIG)
