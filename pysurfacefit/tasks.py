@@ -232,7 +232,7 @@ def parse_dataspec(CONFIG):
         col_dataspec = j.Collection()
     return col_dataspec
 
-def read_fitgroups(CONFIG,verbose=False):
+def read_fitgroups(CONFIG,verbose=False,exclude=True):
     """ Read data fitgroups based on the config file information. """
     
     # Create unified collection for plotting.
@@ -260,7 +260,7 @@ def read_fitgroups(CONFIG,verbose=False):
     wht_fun = eval( CONFIG['DATA']['wht_fun'] )
     
     # Import exclusion collection and make a lookup hash
-    if exclude_file:
+    if exclude_file and exclude:
         col_exclude = j.import_csv(exclude_file)
         #get_exclude_keys = lambda v: tuple([v[k] for k in INPUTS+[OUTPUT]])
         get_exclude_keys = lambda v: tuple([v[k] for k in INPUTS])
@@ -300,7 +300,8 @@ def read_fitgroups(CONFIG,verbose=False):
         # Apply data cutoff
         col = col.subset(col.ids(lambda v: GLOBAL_CUTOFF_MIN<=v[OUTPUT]<=GLOBAL_CUTOFF_MAX)); n = len(col.ids())
         # Apply data exclusion
-        if exclude_file: col = col.subset(col.ids(lambda v: get_exclude_keys(v) not in exclude_hash))
+        if exclude_file and exclude: 
+            col = col.subset(col.ids(lambda v: get_exclude_keys(v) not in exclude_hash))
         print('Excluded %d data points'%(n-len(col.ids())))
         # Get the data columns 
         input_columns = col.getcols(INPUTS)

@@ -60,6 +60,9 @@ class Default(ConfigSection):
 
 # Surface settings (3D case)
 {surface_opacity}
+
+# Other settings
+{annotate_field}
 """
     plot_mode = 'residuals'
     fit_history_stat = 'WHT_SSE'
