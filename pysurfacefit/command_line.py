@@ -56,11 +56,14 @@ def main():
         help='Stage 6: generate Fortran code for fitted model')
 
     parser.add_argument('--plot', nargs='*', type=str, 
-        help='Stage 7: plot sections of the model and compare to data')
+        help='Stage 7: plot sections of the model(s) and compare to data')
+
+    parser.add_argument('--multicut', nargs='*', type=str, 
+        help='Stage 8: plot multiple 1D sections of model(s) and data')
 
     parser.add_argument('--calc', dest='calc',
         action='store_const', const=True, default=False,
-        help='Stage 8: calculate model values on grid')
+        help='Stage 9: calculate model values on grid')
 
     args = parser.parse_args() 
     
@@ -114,5 +117,9 @@ def main():
         if args.plot:
             CONFIG['PLOTTING']['gridspec'] = args.plot[0]
         tasks.plot(CONFIG)
+    elif args.multicut is not None:
+        if args.multicut:
+            CONFIG['MULTICUT']['gridspec'] = args.plot[0]
+        tasks.plot_multicut(CONFIG)
     elif args.calc:        
         tasks.calc(CONFIG)

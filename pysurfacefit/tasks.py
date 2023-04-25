@@ -26,6 +26,37 @@ import pylab as pl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+MARKERS = ['o','v','^','<','>','s','p','P','*','+','x','D','d']
+
+#COLORS = ['blue', 'green', 'red', 'black', 'cyan', 
+#'magenta', 'indigo', 'chartreuse', 'yellow', 'chocolate', 'aqua', 'aquamarine', 'azure', 'beige', 'brown', 
+#'crimson', 'darkblue', 'darkgreen', 'fuchsia', 'gold', 'goldenrod', 
+#'grey', 'ivory', 'coral', 'khaki', 'lavender', 'lightblue', 'lightgreen', 'lime', 
+#'maroon', 'navy', 'olive', 'orange', 'orangered', 'orchid', 'pink', 'plum', 
+#'purple', 'salmon', 'sienna', 'silver', 'tan', 'teal', 'tomato', 'turquoise', 
+#'violet', 'wheat', 'yellowgreen']
+
+COLORS = [
+'blue', 'green', 
+#'red', 
+'black', 'cyan', 
+#'magenta', 'indigo', 'chartreuse', 'yellow', 'chocolate', 'aqua', 'aquamarine', 'azure', 'beige', 'brown',
+'magenta', 'indigo', 'chartreuse', 'yellow', 'aqua', 'aquamarine', 'brown', 
+#'crimson', 'darkblue', 'darkgreen', 'fuchsia', 'gold', 'goldenrod', 
+'darkblue', 'darkgreen', 'fuchsia', 'gold', 'goldenrod', 
+'grey', 
+#'ivory', 
+'coral', 'khaki', 'lavender', 'lightblue', 'lightgreen', 'lime', 
+'maroon', 'navy', 'olive', 'orange', 'orangered', 'orchid', 'pink', 'plum', 
+'purple', 'salmon', 'sienna', 'silver', 'tan', 'teal', 'tomato', 'turquoise', 
+'violet', 'wheat', 'yellowgreen']
+
+COLORS_SUPPORT = [
+    'red', 
+    'magenta', 'indigo', 'chartreuse', 'yellow', 'chocolate', 'aqua', 'aquamarine', 'azure', 'beige', 'brown',
+    'crimson', 'darkblue', 'darkgreen', 'fuchsia', 'gold', 'goldenrod', 
+]
+
 # type conversions minding the None value
 to_type = lambda val,typ: typ(val) if val not in (None,'') else None
 to_int = lambda val: to_type(val,int)
@@ -809,7 +840,20 @@ def parse_gridspec(CONFIG,gridspec_line):
             cmin = float(cmin)
             cstep = float(cstep)
             cmax = float(cmax)
-            value = np.arange(cmin,cmax,cstep)
+            if cmin+cstep>cmax: cstep = cmax-cmin
+            if cstep==0:
+                value = np.array([cmin])
+            else:
+                value = np.arange(cmin,cmax,cstep)
+            indexes_unfixed.append(argpos[argname])
+        elif len(grstr_split)==2:
+            cmin,cmax = grstr_split
+            cmin = float(cmin)
+            cmax = float(cmax)
+            if cmin==cmax:
+                value = np.array([cmin])
+            else:
+                value = np.linspace(cmin,cmax,100)
             indexes_unfixed.append(argpos[argname])
         elif len(grstr_split)==1:
             value = float(grstr_split[0])
@@ -988,19 +1032,6 @@ def plot_residuals(CONFIG):
     
     plt.show()    
 
-#COLORS = ['blue','red','green','magenta','black','cyan',
-#    'yellow','purple','orange','brown','pink','grey',]
-
-MARKERS = ['o','v','^','<','>','s','p','P','*','+','x','D','d']
-
-COLORS = ['blue', 'green', 'red', 'black', 'cyan', 
-'magenta', 'indigo', 'chartreuse', 'yellow', 'chocolate', 'aqua', 'aquamarine', 'azure', 'beige', 'brown', 
-'crimson', 'darkblue', 'darkgreen', 'fuchsia', 'gold', 'goldenrod', 
-'grey', 'ivory', 'coral', 'khaki', 'lavender', 'lightblue', 'lightgreen', 'lime', 
-'maroon', 'navy', 'olive', 'orange', 'orangered', 'orchid', 'pink', 'plum', 
-'purple', 'salmon', 'sienna', 'silver', 'tan', 'teal', 'tomato', 'turquoise', 
-'violet', 'wheat', 'yellowgreen']
-
 def get_argument_bindings(CONFIG):
     """
     Parse coordinate bindings to the names of the data columns.
@@ -1058,7 +1089,7 @@ def plot_sections(CONFIG):
     # Get main model name
     main_model_name = CONFIG['MODEL']['model']
     
-    # Get gridpes and indexes of unfixed arguments
+    # Get gridspec and indexes of unfixed arguments
     gridspec,indexes_unfixed = \
         parse_gridspec(CONFIG,CONFIG['PLOTTING']['gridspec'])
         
@@ -1185,8 +1216,7 @@ def plot_sections(CONFIG):
                 for index_unfixed in indexes_unfixed]+[OUTPUT]+[annotate_field]
         )
         for d in zip(*plot_data):
-            plotter.text(*d)  
-        leg.append('annotation (%s)'%annotate_field)
+            plotter.text(*d)
     
     # Plot models.
     g = Grid(*reduce(lambda x,y:x+y,gridspec))
@@ -1328,6 +1358,187 @@ def plot(CONFIG):
     else:
         print('ERROR: unknown plotting mode "%s"'%plot_mode)
         sys.exit()
+
+def plot_multicut(CONFIG):
+    """ plot multiple 1D cuts and multiple models """
+
+    # Get coordinate bindings.
+    bindings = get_argument_bindings(CONFIG)
+    bindings_dict = dict(bindings)
+    
+    # Get options from config.
+    exclude = CONFIG['DATA']['exclude']
+    E_COLUMN = CONFIG['DATA']['output_column']
+    SHOW_LEGEND = CONFIG['MULTICUT']['show_legend']
+    unfixed_arg_name = CONFIG['MULTICUT']['argument']
+    annotate_field = CONFIG['MULTICUT']['annotate_field']    
+    plot_model = to_bool(CONFIG['MULTICUT']['plot_model'])
+    fullgrid_calc = to_bool(CONFIG['MULTICUT']['fullgrid_calc'])
+    show_lines = to_bool(CONFIG['MULTICUT']['show_lines'])
+    
+    all_arg_names = [c[0] for c in bindings]
+    fixed_arg_names = [c[0] for c in bindings if c[0]!=unfixed_arg_name]
+        
+    # Input names.
+    all_input_names = [c[1] for c in bindings]
+    unfixed_input_name = bindings_dict[unfixed_arg_name]
+    fixed_input_names = [bindings_dict[c] for c in fixed_arg_names]
+
+    # Parse gridspec. 
+    gridspec,indexes_unfixed = \
+        parse_gridspec(CONFIG,CONFIG['MULTICUT']['gridspec'])
+    gridspec_dict = dict(gridspec)
+        
+    # Get array-like options.    
+    bnds_dict = {
+        bindings_dict[c]: [gridspec_dict[c][0],gridspec_dict[c][-1]] \
+            for c in bindings_dict
+    }
+    
+    # Get main model name
+    main_model_name = CONFIG['MODEL']['model']
+
+    # Get addiitonal model list to compare with
+    compare_with_models = CONFIG['MULTICUT']['compare_with_models'].strip()
+
+    # Import model module (in other case, deserialization is not working).   
+    main_model = load_model(CONFIG)
+    
+    # Get fitgroups and calculate statistics.
+    fitgroups,col_data = read_fitgroups(CONFIG,verbose=1,exclude=False)
+    
+    # Get excluded points separately
+    if exclude: col_excluded = j.import_csv(exclude)
+
+    # Filter data points to account for bounds on coordinates.
+    col_data = col_data.subset(col_data.ids(
+        lambda v: reduce(lambda a,b: a and b,[
+            bnds_dict[c][0] <= v[c] <= bnds_dict[c][1] \
+                for c in bnds_dict
+        ])
+    ))
+
+    # Define legend line.
+    def get_legend_line(fixed_input_names,fixed_input_vals,postfix):
+        return ', '.join(
+            ['%s=%.3f'%(name,val) for name,val in zip(
+                fixed_input_names,fixed_input_vals)]) + ' %s'%postfix
+
+    # Start plotting.
+    fig = plt.figure()
+    ax = fig.add_subplot()
+
+    excluded_points = []
+    if exclude:
+        col_excluded_ID_vals = col_excluded.group(
+            lambda v:tuple(v[c] for c in all_input_names))
+    else:
+        col_excluded_ID_vals = set()
+
+    leg = []
+    color_gen = cycle(COLORS)
+    marker = 'o'
+    data_linestyle = '-' if show_lines else ''
+            
+    grpi_sections = col_data.group(lambda v: tuple(v[c] for c in fixed_input_names))
+    grpi_sections_keys = sorted(grpi_sections)
+            
+    for fixed_input_vals in grpi_sections_keys:
+                    
+            col = col_data.subset(grpi_sections[fixed_input_vals])
+        
+            annot_vals,unfixed_input_vals,E_vals = col.getcols(
+                [annotate_field,unfixed_input_name,E_COLUMN],
+                IDs=col.sort(unfixed_input_name),
+            )
+
+            color = next(color_gen)
+
+            ax.plot(unfixed_input_vals,E_vals,marker=marker,color=color,
+                linestyle=data_linestyle)
+            
+            lookup = {coord_name:coord_val \
+                for coord_name,coord_val in zip(fixed_input_names,fixed_input_vals)}
+            
+            for xx,ee,aa in zip(unfixed_input_vals,E_vals,annot_vals):
+                # plot grid points IDs
+                if True: 
+                    ax.text(xx,ee,aa)
+                # collect exclude points
+                lookup[unfixed_input_name] = xx
+                key = tuple(lookup[c] for c in all_input_names)
+                if key in col_excluded_ID_vals:
+                    excluded_points.append((xx,ee))
+            
+            leg.append(get_legend_line(fixed_input_names,fixed_input_vals,'(points)'))
+        
+    indexes_unfixed_ = [all_arg_names.index(unfixed_arg_name)] # specially for plotting models
+        
+    def plot_models_on_grid(g,fixed_input_names,fixed_input_vals,color,marker_flag=False):
+            
+        meshes = g.get_meshes()
+        calc_data = [meshes[i] for i in indexes_unfixed_]
+    
+        models = [main_model]
+        model_names = [main_model_name]
+        if compare_with_models:
+            aux_model_names = parse_semicolon_list(CONFIG,'MULTICUT','compare_with_models')
+            model_names += aux_model_names
+            for model_name in aux_model_names:
+                models.append(load_model_(model_name))
+        
+        for model,marker,model_name in zip(models,cycle(MARKERS),model_names):
+            results = model.calculate(g)            
+            legline = get_legend_line(fixed_input_names,fixed_input_vals,'(%s)'%model_name)
+            print('calculating',legline)
+            leg.append(legline)
+            if not marker_flag:
+                marker = None
+            ax.plot(*calc_data,results,color=color,marker=marker,linestyle='--')
+        
+    # Plot models.
+    
+    marker_flag = fullgrid_calc
+    
+    color_gen = cycle(COLORS)
+    
+    if plot_model:
+        
+        # First, plot model on sections where there are data.
+        for fixed_input_vals in grpi_sections_keys:
+            
+            lookup = {coord_name:coord_val \
+                for coord_name,coord_val in zip(fixed_arg_names,fixed_input_vals)}
+            
+            gridspec_ = (
+                (c,gridspec_dict[c]) \
+                    if c==unfixed_arg_name else (c,[lookup[c]]) \
+                for c in all_arg_names)
+                
+            g = Grid(*reduce(lambda x,y:x+y,gridspec_))
+            
+            color = next(color_gen)
+            
+            plot_models_on_grid(g,fixed_arg_names,fixed_input_vals,color,marker_flag)
+            
+        # Second, if fullgrid_calc=True, plot model on full grid.
+        if fullgrid_calc:
+            raise NotImplementedError
+        
+    if excluded_points:
+        # plot excluded points
+        ax.scatter(*zip(*excluded_points), s=150, facecolors='none', color='black')
+        leg.append('bad points')
+
+    ax.set_xlabel(unfixed_arg_name)
+    ax.set_ylabel(E_COLUMN)
+
+    #plt.title(filename)
+
+    if SHOW_LEGEND: 
+        plt.legend(leg)
+
+    plt.show()
 
 def calc(CONFIG):
     """ Calculate fitted model on a grid. """
