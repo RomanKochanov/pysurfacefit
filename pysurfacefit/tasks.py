@@ -1075,6 +1075,8 @@ def plot_sections(CONFIG):
     calculate_components = to_bool( CONFIG['PLOTTING']['calculate_components'] )
     outlier_stats_type = CONFIG['STAT']['outlier_stats_type']
     plot_outlier_stats = to_bool( CONFIG['PLOTTING']['plot_outlier_stats'] )
+    exclude = CONFIG['DATA']['exclude']
+    annotate_field = CONFIG['PLOTTING']['annotate_field'].strip()
 
     # Get input and output names
     INPUTS = parse_input_columns(CONFIG)
@@ -1087,7 +1089,7 @@ def plot_sections(CONFIG):
     model = load_model(CONFIG)
     
     # Get fitgroups and calculate statistics.
-    fitgroups,_ = read_fitgroups(CONFIG,verbose=1)
+    fitgroups,col_data = read_fitgroups(CONFIG,verbose=1)
     
     # Get model components list.
     components = get_model_components(CONFIG)
@@ -1150,30 +1152,41 @@ def plot_sections(CONFIG):
                         s=marker_size,alpha=scatter_opacity)
         else:
             raise NotImplementedError
+
+    # Define condition for finding 1D section.
+    def section_cond(v):
+        cond = True
+        for index_fixed in indexes_fixed:
+            argname_fixed,colname_fixed = bindings[index_fixed]
+            val_fixed = gridspec_dict[argname_fixed][0]
+            cond_ = v[colname_fixed]==val_fixed
+            cond = cond and cond_
+        return cond
             
     # Plot excluded data points.
-    exclude = CONFIG['DATA']['exclude']
     if exclude:
         col_exclude = j.import_csv(exclude)
-        def condition(v):
-            cond = True
-            for index_fixed in indexes_fixed:
-                argname_fixed,colname_fixed = bindings[index_fixed]
-                val_fixed = gridspec_dict[argname_fixed][0]
-                cond_ = v[colname_fixed]==val_fixed
-                cond = cond and cond_
-            return cond
-        col_exclude = col_exclude.subset(col_exclude.ids(condition))
+        col_exclude = col_exclude.subset(col_exclude.ids(section_cond))
         plot_data = col_exclude.getcols(
             [bindings[index_unfixed][1] \
                 for index_unfixed in indexes_unfixed]+[OUTPUT]
         )
-        aaa = [bindings[index_unfixed][1] for index_unfixed in indexes_unfixed]+[OUTPUT]
         if plot_data[0]:
             plotter.scatter(*plot_data,s=marker_size+50,
                 facecolors='none', color='red',
                 alpha=scatter_opacity)
             leg.append('data excluded')
+            
+    # Plot annotations.
+    if annotate_field:
+        col_data = col_data.subset(col_data.ids(section_cond))
+        plot_data = col_data.getcols(
+            [bindings[index_unfixed][1] \
+                for index_unfixed in indexes_unfixed]+[OUTPUT]+[annotate_field]
+        )
+        for d in zip(*plot_data):
+            plotter.text(*d)  
+        leg.append('annotation (%s)'%annotate_field)
     
     # Plot models.
     g = Grid(*reduce(lambda x,y:x+y,gridspec))
