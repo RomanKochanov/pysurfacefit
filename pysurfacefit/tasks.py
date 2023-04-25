@@ -1168,9 +1168,11 @@ def plot_sections(CONFIG):
             [bindings[index_unfixed][1] \
                 for index_unfixed in indexes_unfixed]+[OUTPUT]
         )
+        aaa = [bindings[index_unfixed][1] for index_unfixed in indexes_unfixed]+[OUTPUT]
         if plot_data[0]:
-            plotter.scatter(*plot_data,c='red',
-                s=marker_size+40,alpha=scatter_opacity)
+            plotter.scatter(*plot_data,s=marker_size+50,
+                facecolors='none', color='red',
+                alpha=scatter_opacity)
             leg.append('data excluded')
     
     # Plot models.
