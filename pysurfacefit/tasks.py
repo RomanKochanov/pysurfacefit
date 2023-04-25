@@ -232,7 +232,7 @@ def parse_dataspec(CONFIG):
         col_dataspec = j.Collection()
     return col_dataspec
 
-def read_fitgroups(CONFIG,verbose=False,exclude=True):
+def read_fitgroups(CONFIG,verbose=0,exclude=True):
     """ Read data fitgroups based on the config file information. """
     
     # Create unified collection for plotting.
@@ -273,7 +273,7 @@ def read_fitgroups(CONFIG,verbose=False,exclude=True):
     col_dataspec = j.Collection()
     # If dataspec is empty, treat datafile as a single data source:
     if datafile and not dataspec:
-        print('Reading datafile ',datafile)
+        if verbose>0: print('Reading from datafile',datafile)
         col_dataspec.update({
             'alias':'default','path':datafile,
             'wht_mul':1.0,'type':None,'include':1})
@@ -284,16 +284,18 @@ def read_fitgroups(CONFIG,verbose=False,exclude=True):
     
     order = []
     
+    col_summary = j.Collection()
+    col_summary.order = ['group','N_points','excluded','type']
+    
     GROUPS_DATA = []
     for item in col_dataspec.getitems():
+        item_summary = {}
         # Get fitgroup properties
         fitgroup_path = item['path'].strip()
         fitgroup_name = item['alias'].strip()
         fitgroup_type = item['type']
         fitgroup_wht_mul = item['wht_mul']
-        print('\n===============================')
-        print(fitgroup_name)
-        print('===============================')
+        item_summary['group'] = fitgroup_name
         # Get points from the CSV file
         col = j.import_csv(fitgroup_path)
         order = col.order
@@ -302,7 +304,8 @@ def read_fitgroups(CONFIG,verbose=False,exclude=True):
         # Apply data exclusion
         if exclude_file and exclude: 
             col = col.subset(col.ids(lambda v: get_exclude_keys(v) not in exclude_hash))
-        print('Excluded %d data points'%(n-len(col.ids())))
+        item_summary['N_points'] = n
+        item_summary['excluded'] = n-len(col.ids())
         # Get the data columns 
         input_columns = col.getcols(INPUTS)
         output_column = col.getcol(OUTPUT)
@@ -310,7 +313,8 @@ def read_fitgroups(CONFIG,verbose=False,exclude=True):
         col.assign('fit_weight',wht_fun)
         data_whts = col.getcol('fit_weight')
         # Print collection contents
-        if verbose:
+        if verbose>=2:
+            print('\nGROUP NAME',fitgroup_name)
             col.tabulate(['N',*(INPUTS+[OUTPUT]),'fit_weight'])
         # Prepare fitting grid (list)
         grid = List(*reduce(lambda x,y:x+y,zip(INPUTS,input_columns))) # list-based grid
@@ -327,7 +331,7 @@ def read_fitgroups(CONFIG,verbose=False,exclude=True):
         else:
             print('ERROR: unknown dataspec type: %s'%str(fitgroup_type))
             sys.exit()
-        print('Treating %s fitgroup as %s'%(fitgroup_name,FitPointsType.__name__))
+        item_summary['type'] = FitPointsType.__name__
         GRP_DATA = FitPoints(
             name=fitgroup_name,input=grid,output=output_column,
             whtmul=fitgroup_wht_mul,whts=data_whts,active=True
@@ -336,6 +340,17 @@ def read_fitgroups(CONFIG,verbose=False,exclude=True):
         col_data.update(col.getitems())
         # Append to groups of data
         GROUPS_DATA.append(GRP_DATA)
+        
+        # Update summary
+        col_summary.update(item_summary)
+        
+    if verbose>0:
+        print('')
+        print('==============================')
+        print('===== FITGROUPS SUMMARY ======')
+        print('==============================')
+        print('')
+        col_summary.tabulate()
                
     col_data.order = order
                
@@ -505,7 +520,7 @@ def fit(CONFIG):
     fitopts = parse_fit_options(CONFIG)
     model_name = CONFIG['MODEL']['model']
     model = load_model(CONFIG)
-    fitgroups,_ = read_fitgroups(CONFIG)
+    fitgroups,_ = read_fitgroups(CONFIG,verbose=1)
     
     # Create Fitter object from scratch.
     f = Fitter(model=model,fitgroups=fitgroups,
@@ -725,7 +740,7 @@ def stat(CONFIG):
     model = load_model(CONFIG)
     
     # Load fitgroups
-    fitgroups,_ = read_fitgroups(CONFIG)
+    fitgroups,_ = read_fitgroups(CONFIG,verbose=1)
     
     # Load Jacobian
     jacfile = model.__class__.__name__+'.jac.npy'
@@ -902,7 +917,7 @@ def plot_residuals(CONFIG):
     model = load_model(CONFIG)
     
     # Get data collection.
-    _,col_data = read_fitgroups(CONFIG)
+    _,col_data = read_fitgroups(CONFIG,verbose=1)
         
     # Prepare observable data.
     ids_sort = col_data.sort(resids_x_axes)
@@ -1072,7 +1087,7 @@ def plot_sections(CONFIG):
     model = load_model(CONFIG)
     
     # Get fitgroups and calculate statistics.
-    fitgroups,_ = read_fitgroups(CONFIG)
+    fitgroups,_ = read_fitgroups(CONFIG,verbose=1)
     
     # Get model components list.
     components = get_model_components(CONFIG)
@@ -1114,7 +1129,6 @@ def plot_sections(CONFIG):
             
         n_tot = len(ind)
         n_sel = np.count_nonzero(ind)
-        print('%s: %d selected out of %d'%(fitgroup,n_sel,n_tot))    
         
         if n_sel==0: continue
         
