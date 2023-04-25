@@ -532,11 +532,44 @@ def load_model_(module_name):
     model = getattr(module,model_object)
     return model
 
-def load_model(CONFIG):
+def load_model_rec(module_name,verbose=0):
+    """ Recursively load module.
+        Fixes errors with simple load_model_ when there are nested imports
+        of the local modules inside the model script. """
+    while True:
+        try:
+            if verbose>0: print('Trying to import',module_name)
+            model = load_model_(module_name)
+            if verbose>0: print('  success!')
+            flag_success = True
+        except ModuleNotFoundError as e:
+            missing_module_name = e.name
+            if verbose>0: print('  failure... Need to import %s first.'%missing_module_name)
+            if missing_module_name==module_name:
+                print('ERROR: cannot find module "%s"'%missing_module_name)
+                sys.exit()
+            load_model_rec(missing_module_name,verbose)
+            flag_success = False
+        if flag_success:
+            if verbose>0: print('breaking for',module_name)
+            break
+    return model
+        
+def load_model(CONFIG,verbose=0):
     """ Load model from its module.
         Model should read its parameters automatically! """
     module_name = CONFIG['MODEL']['model']
-    model = load_model_(module_name)
+    # Old non-recursive import, fails when there is a nested local imports 
+    # inside the model script:
+    #model = load_model_(module_name) 
+    # New recursive import:
+    #verbose = 1 # debug
+    if verbose>0:
+        print('')
+        print('================================')
+        print('Starting import for',module_name)
+        print('================================')
+    model = load_model_rec(module_name,verbose)
     return model
 
 def fit(CONFIG):
