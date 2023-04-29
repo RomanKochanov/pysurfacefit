@@ -554,7 +554,7 @@ def load_model_rec(module_name,verbose=0):
             if verbose>0: print('breaking for',module_name)
             break
     return model
-        
+
 def load_model(CONFIG,verbose=0):
     """ Load model from its module.
         Model should read its parameters automatically! """
@@ -1015,7 +1015,7 @@ def plot_residuals(CONFIG):
     if compare_with_models:
         model_names = parse_semicolon_list(CONFIG,'PLOTTING','compare_with_models')
         for model_name in model_names:
-            models.append(load_model_(model_name))
+            models.append(load_model_rec(model_name))
     
     # =============
     # UPPER SUBPLOT
@@ -1262,7 +1262,7 @@ def plot_sections(CONFIG):
         aux_model_names = parse_semicolon_list(CONFIG,'PLOTTING','compare_with_models')
         model_names += aux_model_names
         for model_name in aux_model_names:
-            models.append(load_model_(model_name))
+            models.append(load_model_rec(model_name))
         
     for model,color,model_name in zip(models,cycle(COLORS),model_names):
             
@@ -1518,7 +1518,7 @@ def plot_multicut(CONFIG):
             aux_model_names = parse_semicolon_list(CONFIG,'MULTICUT','compare_with_models')
             model_names += aux_model_names
             for model_name in aux_model_names:
-                models.append(load_model_(model_name))
+                models.append(load_model_rec(model_name))
         
         for model,marker,model_name in zip(models,cycle(MARKERS),model_names):
             results = model.calculate(g)            

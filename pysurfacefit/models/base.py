@@ -1,6 +1,11 @@
+import inspect
 import numpy as np
 import jeanny3 as j
 from algopy import UTPM
+
+from functools import reduce
+
+from ..grids import List
 
 class Model:
     """
@@ -37,10 +42,60 @@ class Model:
         """
         return self.__func__(params,*inputs)
             
-    def calculate(self,grid): # calculate model on grid defined in grids.py
+    def calculate(self,grid):
+        """ 
+        Calculate model on grid defined in pysurface.grids.
+        """
         return grid.calculate(lambda *x:self.__calc__(self.__params__,*x))
+        
+    def calculate_on_grid(self,grid):
+        """ 
+        Calculate model on grid defined in pysurface.grids.
+        """
+        return self.calculate(grid)
+        
+    def calculate_on_collection(self,collection,mapping={}):
+        """
+        Calculate model on Jeanny3 collection with optional parameter mapping.
+        Doesn't support fast calculation for Sympy models.
+        Mapping should be list,tuple or dictionary.
+        Returns grid and calculated values.
+        """
+        argspec = inspect.getfullargspec(self.__func__)
+        args = argspec.args[2:]
+        if type(mapping) in {list,tuple}:
+            mapping = {arg:argmap for arg,argmap in zip(args,mapping)}
+        map_ = {arg:mapping.get(arg,arg) for arg in args}
+        args_ = list(map_.values())
+        map_cols = {arg_:c for arg_,c in zip(args_,collection.getcols(args_))}
+        grid = List(*reduce(lambda x,y:x+y,[[arg,map_cols[arg]] for arg in map_cols]))
+        return grid,self.calculate(grid)
 
-    def calculate_components(self,grid,compnames=[]): # calculate model and it's components on grid
+    def assign(self,collection,field,mapping={}):
+        """
+        Assign values into Jeanny3 collection with optional parameter mapping.
+        Supports fast calculation for Sympy models.
+        Mapping should be list,tuple or dictionary.
+        """
+        argspec = inspect.getfullargspec(self.__func__)
+        args = argspec.args[2:]
+        if type(mapping) in {list,tuple}:
+            mapping = {arg:argmap for arg,argmap in zip(args,mapping)}
+        map_ = {arg:mapping.get(arg,arg) for arg in args}
+        args_ = list(map_.values())        
+        cc = collection.getcols(args_+['__ID__'])
+        cols = cc[:-1]
+        ids = cc[-1]
+        map_cols = {arg_:c for arg_,c in zip(args_,cols)}
+        grid = List(*reduce(lambda x,y:x+y,[[arg,map_cols[arg]] for arg in map_cols]))
+        vals = self.calculate(grid)
+        for id_,val in zip(ids,vals):
+            collection.getitem(id_)[field] = val
+
+    def calculate_components(self,grid,compnames=[]):
+        """
+        Calculate model and its components on grid.
+        """
         def func_comp(*x):
             res = self.__calc__(self.__params__,*x)
             comps = [self.__components__[name] for name in compnames]
@@ -52,7 +107,10 @@ class Model:
                 meshes[k][i] = hypermesh[i][k]
         return meshes
         
-    def calculate_jac(self,grid):# returns flattened array
+    def calculate_jac(self,grid):
+        """ 
+        Calculate model Jacobian (flattened)
+        """
         jac_tensor = grid.calculate(lambda *x:self.__jac__(self.__params__,*x),dtype=object,flat=True)
         jac_tensor = np.vstack(jac_tensor)
         return jac_tensor
@@ -89,10 +147,8 @@ class Model:
         
     def load_params(self,filename):
         col = j.import_csv(filename)
-        #col.index(lambda v:(v['group'],v['name']))
         col.index(lambda v:v['name'])
         for ID in col.__dicthash__:
-            #group,name = ID
             item = col.__dicthash__[ID]
             if ID in self.__params__.__dicthash__:
                 self.__params__.__dicthash__[ID].update(item)
@@ -100,4 +156,9 @@ class Model:
                 self.__params__.__dicthash__[ID] = item
         
     def __repr__(self):
-        return str(self.__params__)
+        argspec = inspect.getfullargspec(self.__func__)
+        model_args = argspec.args[2:]
+        model_name = self.__class__.__name__
+        sep = '==================================\n'
+        head = 'MODEL CLASS %s: %s\n'%(model_name,', '.join(model_args))
+        return sep+head+sep+str(self.__params__)
