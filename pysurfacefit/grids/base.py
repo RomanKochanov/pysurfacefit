@@ -87,16 +87,8 @@ class Grid(AbstractGrid):
         grids = [self.__desc__[name] for name in vars]        
         meshes = np.meshgrid(*grids)
         self.__meshes__ = meshes
-        #self.__size__ = meshes[0].size
-        #self.__shape__ = meshes[0].shape
         self.__hash__ = {name:i for i,name in enumerate(vars)} # hash for lookup mesh by the variable name
-        
-    #def __getitem__(self,varname):
-    #    return self.__meshes__[self.__hash__[varname]]
-        
-    #def flatten(self):
-    #    return flatten(*self.__meshes__)
-        
+                
     def get_meshes(self,ind=None,flat=False,squeeze=True):
         # https://docs.scipy.org/doc/numpy-1.15.1/reference/generated/numpy.squeeze.html
         meshes = self.__meshes__
@@ -104,6 +96,7 @@ class Grid(AbstractGrid):
             meshes = flatten(*meshes)
         if squeeze:
             meshes = [np.squeeze(_) for _ in meshes]
+            meshes = [np.array([_]) if not _.shape else _ for _ in meshes] # prevents zero-shaped arrays if grid is "degenerate"
         if len(meshes)==1: meshes=meshes[0]
         if ind is None:
             return meshes
@@ -111,7 +104,7 @@ class Grid(AbstractGrid):
             return [mesh[ind] for mesh in meshes]
                                     
     def calculate(self,func,parameters=[],dimension=1,numba=False,
-        flat=False,squeeze=True,dtype=np.float64): # calculate arbitrary function on the grid;         
+        flat=False,squeeze=True,dtype=np.float64): # calculate arbitrary function on the grid;
         
         if numba:
 
@@ -123,8 +116,7 @@ class Grid(AbstractGrid):
             else:
                 res = calc_on_grid_numba_vector(meshes,func,parameters,length,dimension)
             if not flat:
-                res = np.reshape(res,shape)
-            
+                res = np.reshape(res,shape)            
         else:
         
             meshes = self.__meshes__
@@ -152,16 +144,8 @@ class List(AbstractGrid):
         self.__vars__ = vars
         meshes = [self.__desc__[name] for name in vars]
         self.__meshes__ = meshes
-        #self.__size__ = meshes[0].size
-        #self.__shape__ = meshes[0].shape
         self.__hash__ = {name:i for i,name in enumerate(vars)} # hash for lookup mesh by the variable name
-        
-    #def __getitem__(self,varname):
-    #    return self.__meshes__[self.__hash__[varname]]        
-        
-    #def flatten(self): # newly added
-    #    return flatten(*self.__meshes__)
-                        
+                                
     def get_meshes(self,ind=None,flat=False):
         meshes = self.__meshes__
         if len(meshes)==1: meshes=meshes[0]
@@ -181,8 +165,7 @@ class List(AbstractGrid):
             if dimension==1:
                 res = calc_on_grid_numba_scalar(meshes,func,parameters,length)
             else:
-                res = calc_on_grid_numba_vector(meshes,func,parameters,length,dimension)
-            
+                res = calc_on_grid_numba_vector(meshes,func,parameters,length,dimension)            
         else:
         
             meshes = self.__meshes__
