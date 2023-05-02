@@ -1441,7 +1441,7 @@ def plot_multicut(CONFIG):
     main_model_name = CONFIG['MODEL']['model']
 
     # Get addiitonal model list to compare with
-    compare_with_models = CONFIG['MULTICUT']['compare_with_models'].strip()
+    compare_with_models = CONFIG['MULTICUT']['compare_with_models']
 
     # Import model module (in other case, deserialization is not working).   
     main_model = load_model(CONFIG)
@@ -1516,7 +1516,7 @@ def plot_multicut(CONFIG):
         
     indexes_unfixed_ = [all_arg_names.index(unfixed_arg_name)] # specially for plotting models
         
-    def plot_models_on_grid(g,fixed_input_names,fixed_input_vals,color,marker_flag=False):
+    def plot_models_on_grid(g,fixed_input_names,fixed_input_vals,color,marker_flag=False,append_legend=True):
             
         meshes = g.get_meshes()
         calc_data = [meshes[i] for i in indexes_unfixed_]
@@ -1533,26 +1533,69 @@ def plot_multicut(CONFIG):
             results = model.calculate(g)            
             legline = get_legend_line(fixed_input_names,fixed_input_vals,'(%s)'%model_name)
             print('calculating',legline)
-            leg.append(legline)
+            if append_legend:
+                leg.append(legline)
             if not marker_flag:
                 marker = None
             ax.plot(*calc_data,results,color=color,marker=marker,linestyle='--')
         
     # Plot models.
     
-    marker_flag = fullgrid_calc
-    
-    color_gen = cycle(COLORS)
+    #marker_flag = fullgrid_calc
+    marker_flag = False
     
     if plot_model:
         
-        # First, plot model on sections where there are data.
+        # If fullgrid_calc=True, plot model on full grid.        
+        if fullgrid_calc:
+            
+            print('PLOTTING FULL GRID MODEL CUTS')
+            
+            color_gen = cycle(COLORS)
+            
+            fixed_arg_vals = [gridspec_dict[arg] for arg in fixed_arg_names]
+            fixed_arg_vals_meshgrid = np.meshgrid(*fixed_arg_vals)
+            fixed_arg_vals_meshgrid = [c.flatten() for c in fixed_arg_vals_meshgrid]
+            col_fixed_fullgrid = j.Collection()
+            col_fixed_fullgrid.update([
+                {arg:val for arg,val in zip(fixed_arg_names,tup) } \
+                    for tup in zip(*fixed_arg_vals_meshgrid)
+            ])
+            
+            print('Fixed values for the full grid calculation:')
+            col_fixed_fullgrid.tabulate(fixed_arg_names)
+            
+            grpi_sections_ = col_fixed_fullgrid.group(
+                lambda v: tuple(v[c] for c in fixed_arg_names))
+            grpi_sections_keys_ = sorted(grpi_sections_)
+            
+            for fixed_arg_vals in grpi_sections_keys_:
+                
+                lookup = {coord_name:coord_val \
+                    for coord_name,coord_val in zip(fixed_arg_names,fixed_arg_vals)}
+                    
+                gridspec_ = list(
+                    (c,gridspec_dict[c]) \
+                        if c==unfixed_arg_name else (c,[lookup[c]]) \
+                    for c in all_arg_names)
+                    
+                g = Grid(*reduce(lambda x,y:x+y,gridspec_))
+            
+                color = next(color_gen)
+                            
+                plot_models_on_grid(g,fixed_arg_names,fixed_arg_vals,color,
+                    marker_flag,append_legend=False)
+        
+        color_gen = cycle(COLORS)
+        
+        # Plot model on sections where there are data.
+        print('PLOTTING MODEL VS DATA CUTS')
         for fixed_input_vals in grpi_sections_keys:
             
             lookup = {coord_name:coord_val \
                 for coord_name,coord_val in zip(fixed_arg_names,fixed_input_vals)}
             
-            gridspec_ = (
+            gridspec_ = list(
                 (c,gridspec_dict[c]) \
                     if c==unfixed_arg_name else (c,[lookup[c]]) \
                 for c in all_arg_names)
@@ -1561,12 +1604,9 @@ def plot_multicut(CONFIG):
             
             color = next(color_gen)
             
-            plot_models_on_grid(g,fixed_arg_names,fixed_input_vals,color,marker_flag)
-            
-        # Second, if fullgrid_calc=True, plot model on full grid.
-        if fullgrid_calc:
-            raise NotImplementedError
-        
+            plot_models_on_grid(g,fixed_arg_names,fixed_input_vals,color,
+                marker_flag,append_legend=not fullgrid_calc)
+                                
     if excluded_points:
         # plot excluded points
         ax.scatter(*zip(*excluded_points), s=150, facecolors='none', color='black')
