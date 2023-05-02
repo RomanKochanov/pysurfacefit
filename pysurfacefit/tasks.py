@@ -1411,7 +1411,7 @@ def plot_multicut(CONFIG):
     # Get options from config.
     exclude = CONFIG['DATA']['exclude']
     E_COLUMN = CONFIG['DATA']['output_column']
-    SHOW_LEGEND = CONFIG['MULTICUT']['show_legend']
+    show_legend = to_bool(CONFIG['MULTICUT']['show_legend'])
     unfixed_arg_name = CONFIG['MULTICUT']['argument']
     annotate_field = CONFIG['MULTICUT']['annotate_field']    
     plot_model = to_bool(CONFIG['MULTICUT']['plot_model'])
@@ -1577,7 +1577,7 @@ def plot_multicut(CONFIG):
 
     #plt.title(filename)
 
-    if SHOW_LEGEND: 
+    if show_legend: 
         plt.legend(leg)
 
     plt.show()
