@@ -522,24 +522,28 @@ def import_module_by_path(module_name,module_path):
     spec.loader.exec_module(module)
     return module
 
+def load_module_(module_name):
+    """ Load model from its module (no config).
+        Model should read its parameters automatically! """
+    module_path = os.path.join('./',module_name+'.py') # relative path
+    module = import_module_by_path(module_name,module_path)
+    return module
+
 def load_model_(module_name):
     """ Load model from its module (no config).
         Model should read its parameters automatically! """
-    #module_path = os.path.abspath(module_name+'.py') # absolute path
-    module_path = os.path.join('./',module_name+'.py') # relative path
-    module = import_module_by_path(module_name,module_path)
-    model_object = 'model'
-    model = getattr(module,model_object)
+    module = load_module_(module_name)
+    model = getattr(module,'model')
     return model
 
-def load_model_rec(module_name,verbose=0):
+def load_module_rec(module_name,verbose=0):
     """ Recursively load module.
         Fixes errors with simple load_model_ when there are nested imports
         of the local modules inside the model script. """
     while True:
         try:
             if verbose>0: print('Trying to import',module_name)
-            model = load_model_(module_name)
+            module = load_module_(module_name)
             if verbose>0: print('  success!')
             flag_success = True
         except ModuleNotFoundError as e:
@@ -548,11 +552,16 @@ def load_model_rec(module_name,verbose=0):
             if missing_module_name==module_name:
                 print('ERROR: cannot find module "%s"'%missing_module_name)
                 sys.exit()
-            load_model_rec(missing_module_name,verbose)
+            load_module_rec(missing_module_name,verbose)
             flag_success = False
         if flag_success:
             if verbose>0: print('breaking for',module_name)
             break
+    return module
+    
+def load_model_rec(module_name,verbose=0):
+    module = load_module_rec(module_name,verbose)
+    model = getattr(module,'model')
     return model
 
 def load_model(CONFIG,verbose=0):
@@ -1150,7 +1159,7 @@ def plot_sections(CONFIG):
     compare_with_models = CONFIG['PLOTTING']['compare_with_models'].strip()
     
     # Import model module (in other case, deserialization is not working).   
-    model = load_model(CONFIG)
+    model = load_model(CONFIG,verbose=0)
     
     # Get fitgroups and calculate statistics.
     fitgroups,col_data = read_fitgroups(CONFIG,verbose=1)
