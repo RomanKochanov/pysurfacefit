@@ -370,7 +370,11 @@ def read_fitgroups(CONFIG,verbose=0,exclude=True):
         # Add to the plotting collection
         col_data.update(col.getitems())
         # Append to groups of data
-        GROUPS_DATA.append(GRP_DATA)
+        if col.ids():
+            GROUPS_DATA.append(GRP_DATA)
+        else:
+            if verbose>=1: 
+                print(' // skipping empty group(%s)'%fitgroup_name)
         
         # Update summary
         col_summary.update(item_summary)
