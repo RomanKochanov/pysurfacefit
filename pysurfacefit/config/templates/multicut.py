@@ -43,3 +43,4 @@ class Default(ConfigSection):
     show_lines = False
     plot_model = True
     fullgrid_calc = False
+    annotate_field = ''

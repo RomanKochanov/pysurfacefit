@@ -1417,13 +1417,20 @@ def plot_multicut(CONFIG):
     E_COLUMN = CONFIG['DATA']['output_column']
     show_legend = to_bool(CONFIG['MULTICUT']['show_legend'])
     unfixed_arg_name = CONFIG['MULTICUT']['argument']
-    annotate_field = CONFIG['MULTICUT']['annotate_field']    
     plot_model = to_bool(CONFIG['MULTICUT']['plot_model'])
     fullgrid_calc = to_bool(CONFIG['MULTICUT']['fullgrid_calc'])
     show_lines = to_bool(CONFIG['MULTICUT']['show_lines'])
     
     all_arg_names = [c[0] for c in bindings]
     fixed_arg_names = [c[0] for c in bindings if c[0]!=unfixed_arg_name]
+
+    # Annotations.
+    annotate_field = CONFIG['MULTICUT']['annotate_field'].strip()
+    if not annotate_field: 
+        plot_annotations = False
+        annotate_field = '__ID__' # stub
+    else:
+        plot_annotations = True
         
     # Input names.
     all_input_names = [c[1] for c in bindings]
@@ -1492,7 +1499,7 @@ def plot_multicut(CONFIG):
     for fixed_input_vals in grpi_sections_keys:
                     
             col = col_data.subset(grpi_sections[fixed_input_vals])
-        
+                    
             annot_vals,unfixed_input_vals,E_vals = col.getcols(
                 [annotate_field,unfixed_input_name,E_COLUMN],
                 IDs=col.sort(unfixed_input_name),
@@ -1508,7 +1515,7 @@ def plot_multicut(CONFIG):
             
             for xx,ee,aa in zip(unfixed_input_vals,E_vals,annot_vals):
                 # plot grid points IDs
-                if True: 
+                if plot_annotations: 
                     ax.text(xx,ee,aa)
                 # collect exclude points
                 lookup[unfixed_input_name] = xx
@@ -1625,7 +1632,7 @@ def plot_multicut(CONFIG):
         plt.legend(leg)
 
     plt.show()
-
+    
 def calc(CONFIG):
     """ Calculate fitted model on a grid. """
     
