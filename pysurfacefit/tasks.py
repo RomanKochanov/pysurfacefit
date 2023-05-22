@@ -1243,6 +1243,7 @@ def plot_sections(CONFIG):
     # Plot excluded data points.
     if exclude:
         col_exclude = j.import_csv(exclude)
+        col_exclude = col_exclude.subset(col_exclude.ids(lambda v: OUTPUT in v))
         col_exclude = col_exclude.subset(col_exclude.ids(section_cond))
         plot_data = col_exclude.getcols(
             [bindings[index_unfixed][1] \
