@@ -23,12 +23,12 @@ def JSONDefault(obj):
 # ===============================================================================
         
 class Fitter:
-#    def __init__(self,model,inputgrid,output,
-#            penalty_inputgrid=None,penalty_output=[],
-#            penalty_upper_on=False,penalty_lower_on=False,
-#            wpen=None,wpenmul=1.0,
-#            method='LM',wmod=None,wpmul=1.0,jac=False,**argv):
-    def __init__(self,model,fitgroups,wpmul=1.0,weighted=True,rubber_on=True,method='LM',jac=False,**argv):
+    """
+    Class encapsulating the fitting process.
+    """
+
+    def __init__(self,model,fitgroups,wpmul=1.0,weighted=True,rubber_on=True,
+        method='lm',jac=False,silent=False,**argv):
         """
         model - model function
         inputgrid - grid of inputs
@@ -49,6 +49,7 @@ class Fitter:
         self.__options__.update(argv)
         self.__icalcfun__ = 0 # function calculation counter
         self.__icalcjac__ = 0 # jacobian calculation counter
+        self.__silent__ = silent
         
     def set_options(self,**argv):
         self.__options__ = argv
@@ -96,15 +97,15 @@ class Fitter:
         sum_of_squares_tot = np.sum(resids**2)
         # sum_of_squares_grp = np.sum(resids[n_p:]**2); print('sum_of_squares_grp>>>','%.9e'%sum_of_squares_grp)
         sum_of_squares_rub = np.sum(resids_param**2)
-        if self.__icalcfun__%1==0:
+        if not self.__silent__ and self.__icalcfun__%1==0:
             print('CALC FUN %5d>>>  DIST:%13.9e  SSE_RUB:%13.9e SSE_TOT:%13.9e %20s'%\
                  (self.__icalcfun__,np.sqrt(np.sum(p_resids**2)),
                   sum_of_squares_rub,sum_of_squares_tot,
                   '==> WEIGHTED_FIT' if self.__weighted_fit__ else '==> UNWEINGHTED_FIT'
                   ))
-        print('=====data group statistics=====')
+        if not self.__silent__: print('=====data group statistics=====')
         stat = self.__fitgroups__.get_group_stats()
-        stat.tabulate(floatfmt=[
+        if not self.__silent__: stat.tabulate(floatfmt=[
             None,   # GROUP 
             '5.0f', # N   
             '5.1e', # MIN_WHT 
@@ -118,7 +119,7 @@ class Fitter:
             '7.3e', # WHT_SD   
             '7.3e', # UNWHT_SD 
         ])
-        print('===============================')
+        if not self.__silent__: print('===============================')
                 
         # Save history item to fit history collection.
         history_item = {}
@@ -165,7 +166,7 @@ class Fitter:
         # output iteration statistics
         if self.__icalcjac__%1==0:
             p_resids = p-self.__params_initial__.get_values(active_only=True)
-            print('CALC JAC %5d>>>  DIST:%13.9e'%(self.__icalcjac__,np.sqrt(np.sum(p_resids**2))))
+            if not self.__silent__: print('CALC JAC %5d>>>  DIST:%13.9e'%(self.__icalcjac__,np.sqrt(np.sum(p_resids**2))))
 
         return resids
         
@@ -179,7 +180,7 @@ class Fitter:
     #    self.__wpenmul__ = wpenmul
 
     def fit_minimize(self): # a family of methods from scipy.optimize.minimize
-        print('USING SCIPY.OPTIMIZE.MINIMIZE: METHOD=',self.__method__)
+        if not self.__silent__: print('USING SCIPY.OPTIMIZE.MINIMIZE: METHOD=',self.__method__)
         argv = self.__options__.copy()
         argv['bounds'] = self.__model__.__params__.get_bounds(active_only=True)
         if self.__jac__:
@@ -190,8 +191,8 @@ class Fitter:
         return res
     
     def fit_basinhopping(self):
-        print('USING SCIPY.OPTIMIZE.BASINHOPPING/ANNEAL: METHOD=',self.__method__)
-        print('WARNING: PARAMETER BOUNDS ARE IGNORED')
+        if not self.__silent__: print('USING SCIPY.OPTIMIZE.BASINHOPPING/ANNEAL: METHOD=',self.__method__)
+        if not self.__silent__: print('WARNING: PARAMETER BOUNDS ARE IGNORED')
         argv = self.__options__.copy()
         del argv['max_nfev']
         bounds = self.__model__.__params__.get_bounds(active_only=True)
@@ -213,23 +214,24 @@ class Fitter:
         return res
 
     def fit_least_squares(self): # Least squares method
-        print('USING SCIPY.OPTIMIZE.LEAST_SQUARES: METHOD=',self.__method__)
+        if not self.__silent__: print('USING SCIPY.OPTIMIZE.LEAST_SQUARES: METHOD=',self.__method__)
         argv = self.__options__.copy()
         if self.__method__ in {'trf','dogbox'}:
             argv['bounds'] = list(zip(*self.__model__.__params__.get_bounds(active_only=True)))
         elif self.__method__ == 'lm':
-            print('Warning: skipping bounds for the "lm" method')
+            if not self.__silent__: print('Warning: skipping bounds for the "lm" method')
         if self.__jac__:
             argv['jac'] = lambda p:self.residuals_jac(p)
-        print('METHOD OPTIONS:',argv)
+        if not self.__silent__: print('METHOD OPTIONS:',argv)
         res = opt.least_squares(self.residuals,self.__model__.__p__,
             method=self.__method__,**argv) # with user-supplied jacobian
         #self.__fitgroups__.split_global_jacobian(res.jac) # split Jacobian into groups to make statistics
         #self.calculate_covariance_matrix(res) # calculate covariance matrix
         # save Jacobian on disc
         jac_file = self.__model__.__class__.__name__+'.jac'
-        print('Saving Jacobian matrix to %s.npy'%jac_file)
-        np.save(jac_file,res.jac)
+        if not self.__silent__: 
+            print('Saving Jacobian matrix to %s.npy'%jac_file)
+            np.save(jac_file,res.jac)
         return res
         
     def fit(self):        
@@ -237,7 +239,7 @@ class Fitter:
         self.__params_initial__ = copy.deepcopy(self.__model__.__params__)
         icalcfun_old = self.__icalcfun__
         icalcjac_old = self.__icalcjac__
-        print('BEGIN FIT')
+        if not self.__silent__: print('BEGIN FIT')
         if self.__method__ in {'lm','trf','dogbox'}:
             res = self.fit_least_squares()
         elif self.__method__ in {'Nelder-Mead','Powell','CG','BFGS',
@@ -250,15 +252,16 @@ class Fitter:
         else:
             raise Exception('unknown method: ',self.__method__)
         #self.__params_final__ = copy.deepcopy(self.__model__.__params__)        
-        print('END FIT')
-        print('%f seconds elapsed, %d func evals, %d jac evals'%\
+        if not self.__silent__: print('END FIT')
+        if not self.__silent__: print('%f seconds elapsed, %d func evals, %d jac evals'%\
             (time()-t,self.__icalcfun__-icalcfun_old,self.__icalcjac__-icalcjac_old))
         self.__result__ = res
         # create model final
         self.model_final = self.__model__ # create a link instead of a separate object
         # save fit history
-        self.__fit_history__.export_json_list(
-            self.__model__.__class__.__name__+'.fit_history',default=JSONDefault)
+        if not self.__silent__: 
+            self.__fit_history__.export_json_list(
+                self.__model__.__class__.__name__+'.fit_history',default=JSONDefault)
         
     @property
     def model_initial(self):

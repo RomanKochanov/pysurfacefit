@@ -3,6 +3,7 @@ import numpy as np
 import jeanny3 as j
 from algopy import UTPM
 
+import copy
 from functools import reduce
 
 from ..grids import List
@@ -121,7 +122,6 @@ class Model:
             params_ = copy.deepcopy(params)
             params_.set_values(p,active_only=True)
             return self.__calc__(params_,*inputs)
-        t = time()
         p = UTPM.init_jacobian(list(params.get_values(active_only=True))) 
         foo_val = foo(p)
         algopy_jacobian = UTPM.extract_jacobian(foo_val)
