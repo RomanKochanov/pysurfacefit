@@ -168,6 +168,7 @@ def split(CONFIG):
     # Get the config options.
     datafile = CONFIG['DATA']['datafile'].strip()
     dataspec = CONFIG['DATA']['dataspec'].strip()
+    if not dataspec: dataspec = 'dataspec.txt'
     split_column = CONFIG['DATA']['split_column'].strip()
     if not split_column: 
         split_column = CONFIG['DATA']['output_column'].strip()

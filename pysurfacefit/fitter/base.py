@@ -6,6 +6,8 @@ from scipy import optimize as opt
 import numpy as np
 from numpy.linalg import pinv, inv
 
+from . import svd
+
 import jeanny3 as j
 
 # default encoder to save numpy types to JSON file
@@ -234,12 +236,67 @@ class Fitter:
             np.save(jac_file,res.jac)
         return res
         
+    def fit_svd(self):
+
+        # Get basic parameters
+        xdim = self.__fitgroups__.__dim__
+        
+        # ////Get "X,y,w,model_init" parameters form Fitter object        
+        
+        # === Get the initial model === 
+        model = self.__model__
+        
+        # === Get X,y,w matrixes of regression inputs,output, and weights resp. ===
+        
+        # get total number of residuals and create resulting 1D array
+        n_tot = sum([grp.length for grp in self.__fitgroups__ if grp.__active__])
+        X = np.zeros((n_tot,xdim))
+        y = np.zeros((n_tot,1))
+        w = np.zeros((n_tot,1))
+        
+        # loop through the fit groups
+        offset = 0
+        for grp in self.__fitgroups__:
+            if not grp.__active__: continue
+            grplen = grp.length
+            meshes = grp.__inputgrid__.get_meshes(flat=True)
+            X[offset:(offset+grp.length)] = np.stack(meshes,axis=-1)
+            y[offset:(offset+grp.length)] = np.reshape(grp.__output__,(grplen,1))
+            w[offset:(offset+grp.length)] = np.reshape(grp.__full_weights__,(grplen,1))
+            offset += grp.length
+
+        # CURRENTLY THIS ONLY WILL WORK FOR THE NUMBA-POWERED MODELS 
+        # (NEEDS TO BE GENERALIZED FOR THE SIMPLE MODELS)
+        if '__initialized_func__' not in model.__dict__ or model.__initialized_func__ is False:
+            model.__sympy_initialize_func__()
+            model.__initialized_func__ = True    
+            # compile func (can be dangerous since we don't know the input requirements)
+            print('compiling model func...')
+            model.__calc_numbified__(model.__params__,*list(np.random.random(len(model.__input_names__))))
+            print('...done')
+                            
+        # OLD CODE
+        print('\n=== SVD-regression for linear models ===')
+        print('ATTENTION: current implementation ignores parameter weights')
+        print('creating matrix...')
+        t = time()
+        a, y_, scales_, offsets_ = svd._coeff_mat(X,y,w,model)
+        print('%s sec. elapsed for _coeff_mat'%(time()-t))
+        print('starting fit')
+        t = time()
+        p = svd._fit_x(a, y_, scales_, offsets_)
+        print('%s sec. elapsed for _fit_x'%(time()-t))
+        if X.shape[1]>1: # in case of multivariate space
+            p = p.T 
+            p = np.squeeze(p)
+        model.__params__.set_values(p,active_only=True)
+        
     def fit(self):        
         t = time()
         self.__params_initial__ = copy.deepcopy(self.__model__.__params__)
         icalcfun_old = self.__icalcfun__
         icalcjac_old = self.__icalcjac__
-        if not self.__silent__: print('BEGIN FIT')
+        if not self.__silent__: print('\nBEGIN FIT')
         if self.__method__ in {'lm','trf','dogbox'}:
             res = self.fit_least_squares()
         elif self.__method__ in {'Nelder-Mead','Powell','CG','BFGS',
@@ -247,6 +304,8 @@ class Fitter:
                                  'SLSQP','trust-constr','dogleg',
                                  'trust-ncg','trust-exact','trust-krylov'}:
             res = self.fit_minimize()
+        elif self.__method__ in {'svd'}:
+            res = self.fit_svd()
         elif self.__method__ in {'basinhopping','anneal'}:
             res = self.fit_basinhopping()
         else:

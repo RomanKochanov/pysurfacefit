@@ -47,4 +47,4 @@ class Default(ConfigSection):
 {global_cutoff_min}
 """
     wht_fun = 'lambda v: 1'
-    dataspec = 'dataspec.txt'
+    dataspec = ''
