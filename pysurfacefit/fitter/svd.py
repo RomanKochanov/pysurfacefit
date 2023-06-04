@@ -40,18 +40,7 @@ def _coeff_mat_numba(X,w,model_func,params,active_indexes):
         mat_[n,:] -= offset
         offset_vect[n] = offset
 
-    # evaluation of the norm of each column by means of a loop
-    scale_vect = np.empty((n_active_pars, 1))
-    for n in range(n_active_pars):
-        
-        # evaluation of the column's norm (stored for later processing)
-        col_norm = np.linalg.norm(mat_[:, n])
-        scale_vect[n] = col_norm
-        
-        # scaling the column to unit-length
-        mat_[:, n] /= col_norm
-
-    return mat_, scale_vect, offset_vect
+    return mat_, offset_vect
     
 def _coeff_mat(X,y,w,model):
         
@@ -70,18 +59,40 @@ def _coeff_mat(X,y,w,model):
     
     print('starting _coeff_mat_numba')
     t = time()
-    mat_, scale_vect, offset_vect = _coeff_mat_numba(X,w,model_func,params,active_indexes)
+    mat_, offset_vect = _coeff_mat_numba(X,w,model_func,params,active_indexes)
     print('%s sec. elapsed for _coeff_mat_numba'%(time()-t))
     
     y_ = y*w
     
-    return mat_, y_, scale_vect, offset_vect
+    return mat_, y_, offset_vect
         
 @nb.njit(cache=True)
-def _fit_x(a, b, scales, offsets):
-    # linalg solves ax = b
-    det_ = np.linalg.lstsq(a, b+offsets, rcond=-1)[0]
-    # due to the stabilization, the coefficients have the wrong scale, which is corrected now
-    det_ /= scales
+def _fit_x(a, b):
+    
+    #print('SHAPES>>>',a.shape, b.shape, offsets.shape)
+    
+    n_active_pars = a.shape[1]
 
-    return det_
+    # evaluation of the norm of each column by means of a loop
+    scale_vect = np.empty((n_active_pars, 1))
+    for n in range(n_active_pars):
+        
+        #print(n)
+        
+        # evaluation of the column's norm (stored for later processing)
+        col_norm = np.linalg.norm(a[:, n])
+        scale_vect[n] = col_norm
+        
+        # scaling the column to unit-length
+        a[:, n] /= col_norm
+
+    #print('a, b, offsets>>>',a, b, offsets)
+    #np.savetxt('a.txt',a)
+
+    # linalg solves ax = b
+    p = np.linalg.lstsq(a, b, rcond=-1)[0]
+    
+    # due to the stabilization, the coefficients have the wrong scale, which is corrected now
+    p /= scale_vect
+
+    return p,scale_vect

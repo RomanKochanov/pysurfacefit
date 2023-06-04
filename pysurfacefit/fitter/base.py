@@ -6,7 +6,7 @@ from scipy import optimize as opt
 import numpy as np
 from numpy.linalg import pinv, inv
 
-from . import svd
+from . import svd, ransac
 
 import jeanny3 as j
 
@@ -236,8 +236,8 @@ class Fitter:
             np.save(jac_file,res.jac)
         return res
         
-    def fit_svd(self):
-
+    def prepare_svd_matrix(self):
+        
         # Get basic parameters
         xdim = self.__fitgroups__.__dim__
         
@@ -262,7 +262,11 @@ class Fitter:
             meshes = grp.__inputgrid__.get_meshes(flat=True)
             X[offset:(offset+grp.length)] = np.stack(meshes,axis=-1)
             y[offset:(offset+grp.length)] = np.reshape(grp.__output__,(grplen,1))
-            w[offset:(offset+grp.length)] = np.reshape(grp.__full_weights__,(grplen,1))
+            if self.__weighted_fit__:
+                whts = np.reshape(grp.__full_weights__,(grplen,1))
+            else:
+                whts = np.full((grplen,1),1.0)
+            w[offset:(offset+grp.length)] = whts
             offset += grp.length
 
         # CURRENTLY THIS ONLY WILL WORK FOR THE NUMBA-POWERED MODELS 
@@ -275,18 +279,45 @@ class Fitter:
             model.__calc_numbified__(model.__params__,*list(np.random.random(len(model.__input_names__))))
             print('...done')
                             
-        # OLD CODE
+        # MAIN CODE
         print('\n=== SVD-regression for linear models ===')
         print('ATTENTION: current implementation ignores parameter weights')
         print('creating matrix...')
         t = time()
-        a, y_, scales_, offsets_ = svd._coeff_mat(X,y,w,model)
+        a, y_, offsets_ = svd._coeff_mat(X,y,w,model)
         print('%s sec. elapsed for _coeff_mat'%(time()-t))
+        
+        return a, y_, offsets_
+        
+    def fit_svd(self):
+        model = self.__model__
+        xdim = self.__fitgroups__.__dim__
+        a, y_, offsets_ = self.prepare_svd_matrix()
         print('starting fit')
         t = time()
-        p = svd._fit_x(a, y_, scales_, offsets_)
+        p,scales = svd._fit_x(a, y_+offsets_)
         print('%s sec. elapsed for _fit_x'%(time()-t))
-        if X.shape[1]>1: # in case of multivariate space
+        if xdim>1: # in case of multivariate space
+            p = p.T 
+            p = np.squeeze(p)
+        model.__params__.set_values(p,active_only=True)
+        
+    def fit_ransac(self):
+        model = self.__model__
+        xdim = self.__fitgroups__.__dim__
+        a, y_, offsets_ = self.prepare_svd_matrix()
+        print('starting fit')
+        t = time()
+        options = self.__options__
+        p,outliers,maxinliers,thresh = ransac.ransac_sequential(
+            a, y_+offsets_,
+            niter=options['niter'], 
+            accuracy=options['accuracy'], 
+            trial_frac=options['trial_frac'], 
+            inlier_frac=options['inlier_frac'],
+        )
+        print('%s sec. elapsed for ransac_sequential'%(time()-t))
+        if xdim>1: # in case of multivariate space
             p = p.T 
             p = np.squeeze(p)
         model.__params__.set_values(p,active_only=True)
@@ -297,16 +328,19 @@ class Fitter:
         icalcfun_old = self.__icalcfun__
         icalcjac_old = self.__icalcjac__
         if not self.__silent__: print('\nBEGIN FIT')
-        if self.__method__ in {'lm','trf','dogbox'}:
+        method = self.__method__.lower()
+        if method in {'lm','trf','dogbox'}:
             res = self.fit_least_squares()
-        elif self.__method__ in {'Nelder-Mead','Powell','CG','BFGS',
-                                 'Newton-CG','L-BFGS-B','TNC','COBYLA',
-                                 'SLSQP','trust-constr','dogleg',
-                                 'trust-ncg','trust-exact','trust-krylov'}:
+        elif method in {'nelder-mead','powell','cg','bfgs',
+                        'newton-cg','l-bfgs-b','tnc','cobyla',
+                        'slsqp','trust-constr','dogleg',
+                        'trust-ncg','trust-exact','trust-krylov'}:
             res = self.fit_minimize()
-        elif self.__method__ in {'svd'}:
+        elif method in {'svd'}:
             res = self.fit_svd()
-        elif self.__method__ in {'basinhopping','anneal'}:
+        elif method in {'ransac'}:
+            res = self.fit_ransac()
+        elif method in {'basinhopping','anneal'}:
             res = self.fit_basinhopping()
         else:
             raise Exception('unknown method: ',self.__method__)
